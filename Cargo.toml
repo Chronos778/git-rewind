@@ -1,0 +1,25 @@
+[package]
+name = "git-rewind"
+version = "0.1.0"
+edition = "2021"
+authors = ["You <you@example.com>"]
+description = "An AI-powered CLI tool that analyzes a git repository and instantly tells you where you left off."
+repository = "https://github.com/yourusername/git-rewind"
+license = "MIT"
+keywords = ["git", "ai", "openai", "cli", "productivity"]
+categories = ["command-line-utilities", "development-tools"]
+readme = "README.md"
+
+[[bin]]
+name = "rewind"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.102"
+clap = { version = "4.6.1", features = ["derive"] }
+colored = "3.1.1"
+indicatif = "0.18.4"
+reqwest = { version = "0.13.3", features = ["json"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+tokio = { version = "1.52.1", features = ["full"] }
