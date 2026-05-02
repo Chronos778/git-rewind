@@ -14,6 +14,9 @@ struct Config {
     groq_api_key: Option<String>,
     gemini_api_key: Option<String>,
     openai_api_key: Option<String>,
+    groq_model: Option<String>,
+    gemini_model: Option<String>,
+    openai_model: Option<String>,
 }
 
 fn get_config_path() -> Option<std::path::PathBuf> {
@@ -45,32 +48,54 @@ pub fn handle_config_command(action: crate::ConfigCommands) -> Result<()> {
             save_config(&config)?;
             println!("{} API key for {} has been set.", "[SUCCESS]".green(), provider);
         }
-        crate::ConfigCommands::Clear { provider } => {
+        crate::ConfigCommands::Model { provider, model } => {
             match provider.to_lowercase().as_str() {
-                "groq" => config.groq_api_key = None,
-                "gemini" => config.gemini_api_key = None,
-                "openai" => config.openai_api_key = None,
+                "groq" => config.groq_model = Some(model.clone()),
+                "gemini" => config.gemini_model = Some(model.clone()),
+                "openai" => config.openai_model = Some(model.clone()),
                 _ => anyhow::bail!("Unknown provider: {}. Supported providers are: groq, gemini, openai.", provider),
             }
             save_config(&config)?;
-            println!("{} API key for {} has been cleared.", "[SUCCESS]".green(), provider);
+            println!("{} Custom model '{}' for {} has been set.", "[SUCCESS]".green(), model, provider);
+        }
+        crate::ConfigCommands::Clear { provider } => {
+            match provider.to_lowercase().as_str() {
+                "groq" => {
+                    config.groq_api_key = None;
+                    config.groq_model = None;
+                },
+                "gemini" => {
+                    config.gemini_api_key = None;
+                    config.gemini_model = None;
+                },
+                "openai" => {
+                    config.openai_api_key = None;
+                    config.openai_model = None;
+                },
+                _ => anyhow::bail!("Unknown provider: {}. Supported providers are: groq, gemini, openai.", provider),
+            }
+            save_config(&config)?;
+            println!("{} Settings for {} have been cleared.", "[SUCCESS]".green(), provider);
         }
         crate::ConfigCommands::Show => {
-            println!("{} \n", "[ CONFIGURED API KEYS ]".bold());
+            println!("{} \n", "[ CONFIGURED API KEYS & MODELS ]".bold());
             if let Some(key) = &config.groq_api_key {
-                println!("{}: {}", "Groq".green(), format!("{}...", &key[..std::cmp::min(10, key.len())]));
+                let model = config.groq_model.as_deref().unwrap_or("llama-3.3-70b-versatile (default)");
+                println!("{}: {} [Model: {}]", "Groq".green(), format!("{}...", &key[..std::cmp::min(10, key.len())]), model);
             } else {
                 println!("{}: Not set", "Groq".bright_black());
             }
 
             if let Some(key) = &config.gemini_api_key {
-                println!("{}: {}", "Gemini".green(), format!("{}...", &key[..std::cmp::min(10, key.len())]));
+                let model = config.gemini_model.as_deref().unwrap_or("gemini-1.5-flash (default)");
+                println!("{}: {} [Model: {}]", "Gemini".green(), format!("{}...", &key[..std::cmp::min(10, key.len())]), model);
             } else {
                 println!("{}: Not set", "Gemini".bright_black());
             }
 
             if let Some(key) = &config.openai_api_key {
-                println!("{}: {}", "OpenAI".green(), format!("{}...", &key[..std::cmp::min(10, key.len())]));
+                let model = config.openai_model.as_deref().unwrap_or("gpt-4o-mini (default)");
+                println!("{}: {} [Model: {}]", "OpenAI".green(), format!("{}...", &key[..std::cmp::min(10, key.len())]), model);
             } else {
                 println!("{}: Not set", "OpenAI".bright_black());
             }
@@ -194,18 +219,18 @@ async fn api_call(system_prompt: &str, user_prompt: &str) -> Result<String> {
 
     let (vendor, api_key) = configured_key.unwrap();
     
-    let (api_base, model) = match vendor {
+    let (api_base, maybe_model) = match vendor {
         "GROQ" => (
             env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://api.groq.com/openai/v1".to_string()),
-            env::var("OPENAI_MODEL").unwrap_or_else(|_| "llama3-70b-8192".to_string()),
+            env::var("OPENAI_MODEL").ok().or(config.groq_model.clone()),
         ),
         "GEMINI" => (
             env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://generativelanguage.googleapis.com/v1beta/openai".to_string()),
-            env::var("OPENAI_MODEL").unwrap_or_else(|_| "gemini-1.5-flash".to_string()),
+            env::var("OPENAI_MODEL").ok().or(config.gemini_model.clone()),
         ),
         _ => (
             env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
-            env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o-mini".to_string()),
+            env::var("OPENAI_MODEL").ok().or(config.openai_model.clone()),
         ),
     };
 
@@ -213,6 +238,11 @@ async fn api_call(system_prompt: &str, user_prompt: &str) -> Result<String> {
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .context("Failed to build HTTP client")?;
+
+    let model = match maybe_model {
+        Some(m) => m,
+        None => discover_best_model(&client, &api_base, &api_key, vendor).await,
+    };
 
     let res = client
         .post(format!("{}/chat/completions", api_base))
@@ -241,6 +271,87 @@ async fn api_call(system_prompt: &str, user_prompt: &str) -> Result<String> {
         .context("Failed to parse response content")?;
 
     Ok(content.to_string())
+}
+
+async fn discover_best_model(client: &Client, api_base: &str, api_key: &str, vendor: &str) -> String {
+    let default_fallback = match vendor {
+        "GROQ" => "llama-3.3-70b-versatile",
+        "GEMINI" => "gemini-1.5-flash",
+        _ => "gpt-4o-mini",
+    };
+
+    let res = match client
+        .get(format!("{}/models", api_base))
+        .header("Authorization", format!("Bearer {}", api_key))
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(_) => return default_fallback.to_string(),
+    };
+
+    if !res.status().is_success() {
+        return default_fallback.to_string();
+    }
+
+    let body: serde_json::Value = match res.json().await {
+        Ok(b) => b,
+        Err(_) => return default_fallback.to_string(),
+    };
+
+    let mut available_models = Vec::new();
+    if let Some(data) = body.get("data").and_then(|d| d.as_array()) {
+        for item in data {
+            if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
+                let lower_id = id.to_lowercase();
+                // Filter out non-text/vision utility models
+                if lower_id.contains("embedding") || lower_id.contains("whisper") || lower_id.contains("dall-e") || lower_id.contains("vision") || lower_id.contains("tts") || lower_id.contains("audio") || lower_id.contains("moderation") {
+                    continue;
+                }
+                available_models.push(id.to_string());
+            }
+        }
+    }
+
+    if available_models.is_empty() {
+        return default_fallback.to_string();
+    }
+
+    match vendor {
+        "GROQ" => {
+            if let Some(m) = available_models.iter().find(|m| m.contains("versatile") || (m.contains("llama") && m.contains("70b"))) {
+                return m.clone();
+            }
+            if let Some(m) = available_models.iter().find(|m| (m.contains("llama") && m.contains("8b")) || m.contains("mixtral")) {
+                return m.clone();
+            }
+            if let Some(m) = available_models.iter().find(|m| m.contains("llama")) {
+                return m.clone();
+            }
+            available_models[0].clone()
+        }
+        "GEMINI" => {
+            if let Some(m) = available_models.iter().find(|m| m.contains("flash")) {
+                return m.clone();
+            }
+            if let Some(m) = available_models.iter().find(|m| m.contains("gemini")) {
+                return m.clone();
+            }
+            available_models[0].clone()
+        }
+        _ => {
+            if let Some(m) = available_models.iter().find(|m| m.contains("mini")) {
+                return m.clone();
+            }
+            if let Some(m) = available_models.iter().find(|m| m.contains("turbo")) {
+                return m.clone();
+            }
+            if let Some(m) = available_models.iter().find(|m| m.contains("gpt-4")) {
+                return m.clone();
+            }
+            available_models[0].clone()
+        }
+    }
 }
 
 pub async fn analyze_repo(state: &RepoState, short: bool, json_format: bool) -> Result<String> {

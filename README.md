@@ -46,7 +46,7 @@ By default, the first time you run `rewind`, it will launch an interactive setup
 You can use the new `config` command to manually add, view, or remove multiple API keys:
 
 ```bash
-# View your saved keys (redacted)
+# View your saved keys (redacted) and current models
 rewind config show
 
 # Add or change a specific provider's key
@@ -54,7 +54,12 @@ rewind config set groq gsk_123456789...
 rewind config set gemini AIzaSyB...
 rewind config set openai sk-proj-...
 
-# Delete a key
+# Set a custom model for a provider
+# (Useful if the default model is decommissioned or you want to use a newer one)
+rewind config model groq llama-3.3-70b-versatile
+rewind config model openai gpt-4o
+
+# Delete a key and model settings
 rewind config clear openai
 ```
 

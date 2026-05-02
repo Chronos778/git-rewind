@@ -55,12 +55,19 @@ enum ConfigCommands {
         /// The API key
         key: String,
     },
+    /// Set a custom model for a provider (e.g. if a default model is decommissioned)
+    Model {
+        /// The provider (groq, gemini, openai)
+        provider: String,
+        /// The model name
+        model: String,
+    },
     /// Clear an API key
     Clear {
         /// The provider to clear the key for (groq, gemini, openai)
         provider: String,
     },
-    /// Show configured API keys (redacted)
+    /// Show configured API keys (redacted) and custom models
     Show,
 }
 
