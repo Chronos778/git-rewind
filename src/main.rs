@@ -18,6 +18,9 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    #[cfg(windows)]
+    let _ = colored::control::set_virtual_terminal(true);
+
     let args = Args::parse();
 
     // 1. Check if git repo and get state

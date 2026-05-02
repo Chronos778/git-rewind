@@ -12,42 +12,63 @@ You work on a feature, switch to a bugfix, leave for the weekend, and come back 
 
 ## Installation
 
-### Option 1: Pre-compiled Binaries (Recommended)
-You do not need Rust or any developer tools installed to use `rewind`. 
-1. Go to the [Releases](https://github.com/Chronos778/git-rewind/releases) page of this repository.
-2. Download the archive for your operating system (`.zip` for Windows, `.tar.gz` for macOS/Linux).
-3. Extract the `<binary>` executable and move it to a folder that is in your system's PATH (e.g., `/usr/local/bin` on Linux/Mac, or `C:\Windows` on Windows).
+### Option 1: Automatic Install Scripts (Recommended)
+You do not need Rust or developer tools installed. These scripts will download the latest binary, place it in an appropriate folder (`~/.local/bin` for Unix, `%USERPROFILE%\.rewindin` for Windows), and automatically add it to your system's PATH.
+
+**Windows (PowerShell):**
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Chronos778/git-rewind/main/install.ps1" -OutFile "$env:TEMP
+ewind_install.ps1"
+powershell -ExecutionPolicy Bypass -File "$env:TEMP
+ewind_install.ps1"
+```
+*(If Windows Defender says it's "not safe to run" after installation, it's just because the binary is unsigned. Click "More info" -> "Run anyway", or use Option 2 below if you prefer to compile it yourself.)*
+
+**Linux / macOS (Bash):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/Chronos778/git-rewind/main/install.sh | bash
+```
 
 ### Option 2: Using Cargo (For Rust Developers)
-If you already have the Rust toolchain installed, you can compile and install it directly via crates.io:
+If you already have the Rust toolchain installed, you can compile and install it directly from this repository. This bypasses the unsigned binary warning on Windows entirely since it compiles locally!
 ```bash
-cargo install git-rewind
+cargo install --git https://github.com/Chronos778/git-rewind.git
 ```
 
-### Option 3: Build from Source
-```bash
-git clone https://github.com/Chronos778/git-rewind.git
-cd git-rewind
-cargo install --path .
-```
+### Option 3: Manual Pre-compiled Binaries
+1. Go to the [Releases](https://github.com/Chronos778/git-rewind/releases) page of this repository.
+2. Download the archive for your operating system (`.zip` for Windows, `.tar.gz` for macOS/Linux).
+3. Extract the `rewind` executable and add it to your PATH manually.
 
 ## Configuration
 
-`rewind` is designed strictly with free tiers in mind, along with traditional paid tiers. It automatically checks your environment variables for keys to several top providers:
+`rewind` checks your environment variables for keys to several top providers:
 
 To use **Groq** (insanely fast, generous free tier):
 ```bash
+# Linux/macOS:
 export GROQ_API_KEY="gsk_..."
+
+# Windows PowerShell:
+$env:GROQ_API_KEY="gsk_..."
 ```
 
 To use **Gemini** (huge free tier, context window):
 ```bash
+# Linux/macOS:
 export GEMINI_API_KEY="AIza..."
+
+# Windows PowerShell:
+$env:GEMINI_API_KEY="AIza..."
 ```
 
 To use **OpenAI**:
 ```bash
+# Linux/macOS:
 export OPENAI_API_KEY="sk-..."
+
+# Windows PowerShell:
+$env:OPENAI_API_KEY="sk-..."
 ```
 
 *(Note: If multiple keys are set, it prioritizes Groq > Gemini > OpenAI to help limit accidental costs).*
@@ -55,9 +76,15 @@ export OPENAI_API_KEY="sk-..."
 ### Custom Models / Local LLMs (Ollama, vLLM)
 You can override the API base and model used by setting these variables (works perfectly with local servers like Ollama!):
 ```bash
+# Linux/macOS:
 export OPENAI_API_BASE="http://localhost:11434/v1"
 export OPENAI_MODEL="llama3-8b-8192"
 export OPENAI_API_KEY="ignore" # If using a local tool that ignores keys
+
+# Windows PowerShell:
+$env:OPENAI_API_BASE="http://localhost:11434/v1"
+$env:OPENAI_MODEL="llama3-8b-8192"
+$env:OPENAI_API_KEY="ignore"
 ```
 
 ## Usage
