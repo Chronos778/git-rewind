@@ -43,7 +43,7 @@ pub fn handle_config_command(action: crate::ConfigCommands) -> Result<()> {
                 _ => anyhow::bail!("Unknown provider: {}. Supported providers are: groq, gemini, openai.", provider),
             }
             save_config(&config)?;
-            println!("{} API key for {} has been set.", "✅".green(), provider);
+            println!("{} API key for {} has been set.", "[SUCCESS]".green(), provider);
         }
         crate::ConfigCommands::Clear { provider } => {
             match provider.to_lowercase().as_str() {
@@ -53,10 +53,10 @@ pub fn handle_config_command(action: crate::ConfigCommands) -> Result<()> {
                 _ => anyhow::bail!("Unknown provider: {}. Supported providers are: groq, gemini, openai.", provider),
             }
             save_config(&config)?;
-            println!("{} API key for {} has been cleared.", "✅".green(), provider);
+            println!("{} API key for {} has been cleared.", "[SUCCESS]".green(), provider);
         }
         crate::ConfigCommands::Show => {
-            println!("{} \n", "--- Configured API Keys ---".bold());
+            println!("{} \n", "[ CONFIGURED API KEYS ]".bold());
             if let Some(key) = &config.groq_api_key {
                 println!("{}: {}", "Groq".green(), format!("{}...", &key[..std::cmp::min(10, key.len())]));
             } else {
@@ -77,6 +77,12 @@ pub fn handle_config_command(action: crate::ConfigCommands) -> Result<()> {
         }
     }
     Ok(())
+}
+
+pub fn clear_all_data() {
+    if let Some(proj_dirs) = ProjectDirs::from("com", "Rewind", "Rewind") {
+        let _ = fs::remove_dir_all(proj_dirs.config_dir());
+    }
 }
 
 fn save_config(config: &Config) -> Result<()> {
@@ -142,47 +148,7 @@ pub fn ensure_configured() -> Result<()> {
     Ok(())
 }
 
-pub async fn analyze_repo(state: &RepoState) -> Result<String> {
-    let config = load_config();
-
-    // Auto-detect provider based on available keys.
-    // Order of precedence: Env Vars -> Config File
-
-    let mut configured_key = None;
-
-    // 1. Check Env Vars or Config File
-    if let Ok(key) = env::var("GROQ_API_KEY") {
-        configured_key = Some(("GROQ", key));
-    } else if let Ok(key) = env::var("GEMINI_API_KEY") {
-        configured_key = Some(("GEMINI", key));
-    } else if let Ok(key) = env::var("OPENAI_API_KEY") {
-        configured_key = Some(("OPENAI", key));
-    } else if let Some(key) = config.groq_api_key.clone() {
-        configured_key = Some(("GROQ", key));
-    } else if let Some(key) = config.gemini_api_key.clone() {
-        configured_key = Some(("GEMINI", key));
-    } else if let Some(key) = config.openai_api_key.clone() {
-        configured_key = Some(("OPENAI", key));
-    }
-
-    // 3. Map to specific endpoints based on detected provider
-    let (vendor, api_key) = configured_key.unwrap();
-    
-    let (api_base, model) = match vendor {
-        "GROQ" => (
-            env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://api.groq.com/openai/v1".to_string()),
-            env::var("OPENAI_MODEL").unwrap_or_else(|_| "llama3-70b-8192".to_string()),
-        ),
-        "GEMINI" => (
-            env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://generativelanguage.googleapis.com/v1beta/openai".to_string()),
-            env::var("OPENAI_MODEL").unwrap_or_else(|_| "gemini-1.5-flash".to_string()),
-        ),
-        _ => (
-            env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
-            env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o-mini".to_string()),
-        ),
-    };
-
+pub fn build_user_prompt(state: &RepoState) -> String {
     let mut user_prompt = format!(
         "Repository State:\n\
         - Branch: {}\n\
@@ -200,9 +166,51 @@ pub async fn analyze_repo(state: &RepoState) -> Result<String> {
         let diff = truncate_lines(&state.diff, 10000);
         user_prompt.push_str(&format!("- Unstaged Changes:\n{}\n", diff));
     }
+    user_prompt
+}
+
+async fn api_call(system_prompt: &str, user_prompt: &str) -> Result<String> {
+    let config = load_config();
+
+    let mut configured_key = None;
+
+    if let Ok(key) = env::var("GROQ_API_KEY") {
+        configured_key = Some(("GROQ", key));
+    } else if let Ok(key) = env::var("GEMINI_API_KEY") {
+        configured_key = Some(("GEMINI", key));
+    } else if let Ok(key) = env::var("OPENAI_API_KEY") {
+        configured_key = Some(("OPENAI", key));
+    } else if let Some(key) = config.groq_api_key.clone() {
+        configured_key = Some(("GROQ", key));
+    } else if let Some(key) = config.gemini_api_key.clone() {
+        configured_key = Some(("GEMINI", key));
+    } else if let Some(key) = config.openai_api_key.clone() {
+        configured_key = Some(("OPENAI", key));
+    }
+
+    if configured_key.is_none() {
+        anyhow::bail!("API key not configured. Run `rewind config set <provider> <key>`.");
+    }
+
+    let (vendor, api_key) = configured_key.unwrap();
+    
+    let (api_base, model) = match vendor {
+        "GROQ" => (
+            env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://api.groq.com/openai/v1".to_string()),
+            env::var("OPENAI_MODEL").unwrap_or_else(|_| "llama3-70b-8192".to_string()),
+        ),
+        "GEMINI" => (
+            env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://generativelanguage.googleapis.com/v1beta/openai".to_string()),
+            env::var("OPENAI_MODEL").unwrap_or_else(|_| "gemini-1.5-flash".to_string()),
+        ),
+        _ => (
+            env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
+            env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o-mini".to_string()),
+        ),
+    };
 
     let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(30)) // Security/Robustness: Prevents infinite hangs if the API is unresponsive
+        .timeout(std::time::Duration::from_secs(30))
         .build()
         .context("Failed to build HTTP client")?;
 
@@ -212,7 +220,7 @@ pub async fn analyze_repo(state: &RepoState) -> Result<String> {
         .json(&json!({
             "model": model,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
             "temperature": 0.7,
@@ -233,6 +241,39 @@ pub async fn analyze_repo(state: &RepoState) -> Result<String> {
         .context("Failed to parse response content")?;
 
     Ok(content.to_string())
+}
+
+pub async fn analyze_repo(state: &RepoState, short: bool, json_format: bool) -> Result<String> {
+    let mut actual_system_prompt = SYSTEM_PROMPT.to_string();
+    if short {
+        actual_system_prompt.push_str("\n\nConstraint: Your response MUST be extremely short. 2 sentences maximum.");
+    }
+    if json_format {
+        actual_system_prompt.push_str("\n\nConstraint: Output only raw plaintext without formatting. Do not use code blocks.");
+    }
+    let user_prompt = build_user_prompt(state);
+    api_call(&actual_system_prompt, &user_prompt).await
+}
+
+pub async fn generate_commit_message(state: &RepoState) -> Result<String> {
+    let system_prompt = "You are an expert developer. Generate a clean, descriptive, and conventional Git commit message based on the provided diff. Output ONLY the commit message. First line should be the subject. Then a blank line, then bullet points for details if needed.";
+    let mut user_prompt = String::new();
+    if !state.diff_cached.is_empty() {
+        user_prompt.push_str(&state.diff_cached);
+    } else if !state.diff.is_empty() {
+        user_prompt.push_str(&state.diff);
+    } else {
+        anyhow::bail!("No changes found to generate a commit message for.");
+    }
+    
+    let diff = truncate_lines(&user_prompt, 10000);
+    api_call(system_prompt, &diff).await
+}
+
+pub async fn ask_question(state: &RepoState, query: &str) -> Result<String> {
+    let system_prompt = "You are an expert AI pair programmer embedded in the user's terminal. Answer the user's question accurately based on their current repository state and diffs.";
+    let user_prompt = format!("{}\n\nUser Question:\n{}", build_user_prompt(state), query);
+    api_call(system_prompt, &user_prompt).await
 }
 
 /// Truncates a string to roughly `max_bytes` while preserving line breaks.

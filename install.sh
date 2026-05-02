@@ -49,7 +49,7 @@ if [ ! -x "$INSTALL_DIR/rewind" ]; then
     exit 1
 fi
 
-echo "Installation Complete! ✅"
+echo "[SUCCESS] Installation Complete!"
 echo "Binary installed to $INSTALL_DIR/rewind."
 
 case ":$PATH:" in

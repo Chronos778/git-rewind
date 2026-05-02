@@ -48,6 +48,6 @@ if ($UserPath -notmatch [regex]::Escape($InstallDir)) {
     Write-Host "Added $InstallDir to your PATH." -ForegroundColor Yellow
 }
 
-Write-Host "Installation Complete! ✅" -ForegroundColor Green
+Write-Host "[SUCCESS] Installation Complete!" -ForegroundColor Green
 Write-Host "You can now run 'rewind' in any new terminal." -ForegroundColor Green
 Write-Host "Note: You MUST restart your current terminal to use the command." -ForegroundColor Yellow

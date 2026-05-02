@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use std::process::Command;
+use std::fs;
 
 pub struct RepoState {
     pub branch: String,
@@ -7,6 +8,19 @@ pub struct RepoState {
     pub log: String,
     pub diff: String,
     pub diff_cached: String,
+}
+
+fn get_exclusions() -> Vec<String> {
+    let mut exclusions = Vec::new();
+    if let Ok(content) = fs::read_to_string(".rewindignore") {
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if !trimmed.is_empty() && !trimmed.starts_with('#') {
+                exclusions.push(format!(":(exclude){}", trimmed));
+            }
+        }
+    }
+    exclusions
 }
 
 pub fn get_repo_state() -> Result<RepoState> {
@@ -23,11 +37,19 @@ pub fn get_repo_state() -> Result<RepoState> {
         anyhow::bail!("Not a git repository (or any of the parent directories).");
     }
 
+    let exclusions = get_exclusions();
+    let mut diff_args_uncached = vec!["diff", "--stat", "-p", "--", "."];
+    let mut diff_args_cached = vec!["diff", "--cached", "--stat", "-p", "--", "."];
+    
+    let exclusion_refs: Vec<&str> = exclusions.iter().map(|s| s.as_str()).collect();
+    diff_args_uncached.extend(&exclusion_refs);
+    diff_args_cached.extend(&exclusion_refs);
+
     let branch = run_git(&["branch", "--show-current"])?;
     let status = run_git(&["status", "--short", "--branch"])?;
     let log = run_git(&["log", "-n", "5", "--oneline"])?;
-    let diff = run_git(&["diff", "--stat", "-p"])?; // Include stat and diff
-    let diff_cached = run_git(&["diff", "--cached", "--stat", "-p"])?;
+    let diff = run_git(&diff_args_uncached)?; 
+    let diff_cached = run_git(&diff_args_cached)?;
 
     Ok(RepoState {
         branch,

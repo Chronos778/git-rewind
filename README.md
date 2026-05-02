@@ -1,4 +1,4 @@
-# Rewind ⏪
+# Rewind
 
 An AI-powered CLI tool that instantly tells you where you left off in your Git repository. 
 
