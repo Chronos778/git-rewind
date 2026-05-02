@@ -12,7 +12,22 @@ You work on a feature, switch to a bugfix, leave for the weekend, and come back 
 
 ## Installation
 
+### Option 1: Pre-compiled Binaries (Recommended)
+You do not need Rust or any developer tools installed to use `rewind`. 
+1. Go to the [Releases](https://github.com/Chronos778/git-rewind/releases) page of this repository.
+2. Download the archive for your operating system (`.zip` for Windows, `.tar.gz` for macOS/Linux).
+3. Extract the `<binary>` executable and move it to a folder that is in your system's PATH (e.g., `/usr/local/bin` on Linux/Mac, or `C:\Windows` on Windows).
+
+### Option 2: Using Cargo (For Rust Developers)
+If you already have the Rust toolchain installed, you can compile and install it directly via crates.io:
 ```bash
+cargo install git-rewind
+```
+
+### Option 3: Build from Source
+```bash
+git clone https://github.com/Chronos778/git-rewind.git
+cd git-rewind
 cargo install --path .
 ```
 
