@@ -105,12 +105,68 @@ $env:OPENAI_API_KEY="ignore"
 
 ## Usage
 
-Simply run:
+Simply navigate to any Git repository and run:
 ```bash
 rewind
 ```
 
-If you want to see what data `rewind` sends to the AI, use:
+When you run `rewind`, it performs the following automatically:
+1. Analyzes your Git state (branch, recent commits, staged and unstaged changes).
+2. Sends the context to the configured LLM.
+3. Prints a conversational brief about your repository.
+4. Saves a copy of the brief to `.rewind-brief.md` in your current directory and adds it to your `.gitignore`.
+
+### Advanced Commands
+
+`rewind` comes with several additional productivity tools built-in:
+
+**Generate a Commit Message**  
+Automatically write a conventional commit message based on your staged/unstaged changes:
 ```bash
+rewind commit
+```
+
+**Ask Codebase Questions**  
+Ask the AI a specific question about your uncommitted changes or recent work:
+```bash
+rewind ask "Did I finish implementing the user authentication?"
+```
+
+**Token Estimation**  
+Check how many tokens/characters your changes will consume before making an API call:
+```bash
+rewind estimate
+```
+
+**Output Formatting**  
+You can modify how `rewind` outputs data using flags:
+```bash
+# Output exactly 2 sentences maximum
+rewind --short
+
+# Output raw JSON for scripts to consume
+rewind --json
+
+# See exactly what raw Git data is being sent to the AI (skips API call)
 rewind --dry-run
+```
+
+### Excluding Files (`.rewindignore`)
+If you have massive auto-generated files (like `package-lock.json` or compiled assets) that your `.gitignore` might miss but you want to hide from the AI to save tokens, create a `.rewindignore` file in your repository:
+```text
+# Example .rewindignore
+yarn.lock
+Cargo.lock
+dist/
+*.svg
+```
+
+### Maintenance Commands
+
+```bash
+# Update rewind to the latest version directly from GitHub Releases
+rewind update
+
+# Uninstall rewind and remove all stored configuration/keys
+rewind uninstall
 ```
