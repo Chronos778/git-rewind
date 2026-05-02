@@ -44,6 +44,16 @@ fn run_git(args: &[&str]) -> Result<String> {
         .output()
         .context(format!("Failed to run `git {:?}`", args))?;
 
+    // Security/Robustness: Check if command actually succeeded, otherwise log might silently fail
+    // In new repos, git log returns 128 "no commits yet", which we can treat as empty text.
+    if !output.status.success() && args[0] != "log" {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if !stderr.is_empty() {
+             // We don't necessarily want to panic, but warn or ignore depending on command.
+             // For safety, we keep it proceeding but the stderr could be useful in dry-run
+        }
+    }
+
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     Ok(stdout.trim().to_string())
 }

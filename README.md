@@ -18,16 +18,31 @@ cargo install --path .
 
 ## Configuration
 
-Set your OpenAI API key (or any OpenAI-compatible API):
+`rewind` is designed strictly with free tiers in mind, along with traditional paid tiers. It automatically checks your environment variables for keys to several top providers:
 
+To use **Groq** (insanely fast, generous free tier):
 ```bash
-export OPENAI_API_KEY="your-api-key"
+export GROQ_API_KEY="gsk_..."
 ```
 
-You can also use alternative models/APIs by setting:
+To use **Gemini** (huge free tier, context window):
 ```bash
-export OPENAI_API_BASE="https://api.openai.com/v1"
-export OPENAI_MODEL="gpt-4o"
+export GEMINI_API_KEY="AIza..."
+```
+
+To use **OpenAI**:
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+*(Note: If multiple keys are set, it prioritizes Groq > Gemini > OpenAI to help limit accidental costs).*
+
+### Custom Models / Local LLMs (Ollama, vLLM)
+You can override the API base and model used by setting these variables (works perfectly with local servers like Ollama!):
+```bash
+export OPENAI_API_BASE="http://localhost:11434/v1"
+export OPENAI_MODEL="llama3-8b-8192"
+export OPENAI_API_KEY="ignore" # If using a local tool that ignores keys
 ```
 
 ## Usage

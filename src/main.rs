@@ -51,9 +51,10 @@ async fn main() -> Result<()> {
     let summary = summary?;
 
     // 3. Output result
-    println!("\n{}\n", "=".repeat(60).bright_black());
-    println!("{}", summary.bright_white());
-    println!("\n{}\n", "=".repeat(60).bright_black());
+    println!("\n{}", " REPOSITORY BRIEF ".bold());
+    println!("{}\n", "─".repeat(60).bright_black());
+    println!("{}", summary);
+    println!("\n{}", "─".repeat(60).bright_black());
 
     Ok(())
 }

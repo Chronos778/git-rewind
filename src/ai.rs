@@ -1,8 +1,45 @@
 use crate::git::RepoState;
 use anyhow::{Context, Result};
+use directories::ProjectDirs;
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::env;
+use std::fs;
+use std::io::{self, Write};
+
+#[derive(Serialize, Deserialize, Default)]
+struct Config {
+    groq_api_key: Option<String>,
+    gemini_api_key: Option<String>,
+    openai_api_key: Option<String>,
+}
+
+fn get_config_path() -> Option<std::path::PathBuf> {
+    ProjectDirs::from("com", "Rewind", "Rewind").map(|proj_dirs| proj_dirs.config_dir().join("config.json"))
+}
+
+fn load_config() -> Config {
+    if let Some(path) = get_config_path() {
+        if let Ok(contents) = fs::read_to_string(path) {
+            if let Ok(config) = serde_json::from_str(&contents) {
+                return config;
+            }
+        }
+    }
+    Config::default()
+}
+
+fn save_config(config: &Config) -> Result<()> {
+    if let Some(path) = get_config_path() {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let contents = serde_json::to_string_pretty(config)?;
+        fs::write(path, contents)?;
+    }
+    Ok(())
+}
 
 const SYSTEM_PROMPT: &str = "\
 You are an AI assistant helping a developer instantly get back into their flow. \
@@ -17,13 +54,78 @@ Do not output markdown code blocks unless it's a specific shell command they sho
 Make it sound like a helpful colleague bringing them up to speed.";
 
 pub async fn analyze_repo(state: &RepoState) -> Result<String> {
-    let api_key = env::var("OPENAI_API_KEY")
-        .context("OPENAI_API_KEY environment variable is not set. Please set it to use rewind.")?;
+    let mut config = load_config();
 
-    // Allow overriding the API base url for compatibility with other OpenAI-compatible APIs (like Ollama, LiteLLM, vLLM)
-    let api_base =
-        env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://api.openai.com/v1".to_string());
-    let model = env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
+    // Auto-detect provider based on available keys.
+    // Order of precedence: Env Vars -> Config File -> Prompt New User
+
+    let mut configured_key = None;
+
+    // 1. Check Env Vars or Config File
+    if let Ok(key) = env::var("GROQ_API_KEY") {
+        configured_key = Some(("GROQ", key));
+    } else if let Ok(key) = env::var("GEMINI_API_KEY") {
+        configured_key = Some(("GEMINI", key));
+    } else if let Ok(key) = env::var("OPENAI_API_KEY") {
+        configured_key = Some(("OPENAI", key));
+    } else if let Some(key) = config.groq_api_key.clone() {
+        configured_key = Some(("GROQ", key));
+    } else if let Some(key) = config.gemini_api_key.clone() {
+        configured_key = Some(("GEMINI", key));
+    } else if let Some(key) = config.openai_api_key.clone() {
+        configured_key = Some(("OPENAI", key));
+    }
+
+    // 2. If absolutely no key is found, prompt the user globally (First-time setup)
+    if configured_key.is_none() {
+        println!("Welcome to Rewind. First-time setup required.");
+        println!("Please enter your preferred API key (Groq, Gemini, or OpenAI supported).");
+        print!("API Key: ");
+        io::stdout().flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let key = input.trim().to_string();
+
+        if key.is_empty() {
+            anyhow::bail!("No API key provided. Exiting.");
+        }
+
+        // Auto-detect based on key prefix
+        if key.starts_with("gsk_") {
+            println!("Provider detected: Groq. Saving configuration...");
+            config.groq_api_key = Some(key.clone());
+            configured_key = Some(("GROQ", key));
+        } else if key.starts_with("AIza") {
+            println!("Provider detected: Gemini. Saving configuration...");
+            config.gemini_api_key = Some(key.clone());
+            configured_key = Some(("GEMINI", key));
+        } else {
+            println!("Provider detected: OpenAI. Saving configuration...");
+            config.openai_api_key = Some(key.clone());
+            configured_key = Some(("OPENAI", key));
+        }
+        
+        let _ = save_config(&config);
+    }
+
+    // 3. Map to specific endpoints based on detected provider
+    let (vendor, api_key) = configured_key.unwrap();
+    
+    let (api_base, model) = match vendor {
+        "GROQ" => (
+            env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://api.groq.com/openai/v1".to_string()),
+            env::var("OPENAI_MODEL").unwrap_or_else(|_| "llama3-70b-8192".to_string()),
+        ),
+        "GEMINI" => (
+            env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://generativelanguage.googleapis.com/v1beta/openai".to_string()),
+            env::var("OPENAI_MODEL").unwrap_or_else(|_| "gemini-1.5-flash".to_string()),
+        ),
+        _ => (
+            env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
+            env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o-mini".to_string()),
+        ),
+    };
 
     let mut user_prompt = format!(
         "Repository State:\n\
@@ -43,7 +145,11 @@ pub async fn analyze_repo(state: &RepoState) -> Result<String> {
         user_prompt.push_str(&format!("- Unstaged Changes:\n{}\n", diff));
     }
 
-    let client = Client::new();
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(30)) // Security/Robustness: Prevents infinite hangs if the API is unresponsive
+        .build()
+        .context("Failed to build HTTP client")?;
+
     let res = client
         .post(format!("{}/chat/completions", api_base))
         .header("Authorization", format!("Bearer {}", api_key))
