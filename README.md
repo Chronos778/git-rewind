@@ -29,10 +29,10 @@ ewind_install.ps1"
 curl -fsSL https://raw.githubusercontent.com/Chronos778/git-rewind/main/install.sh | bash
 ```
 
-### Option 2: Using Cargo (For Rust Developers)
-If you already have the Rust toolchain installed, you can compile and install it directly from this repository. This bypasses the unsigned binary warning on Windows entirely since it compiles locally!
+### Option 2: Using Cargo (crates.io)
+If you already have the Rust toolchain installed, you can compile and install it directly from crates.io. This bypasses the unsigned binary warning on Windows entirely since it compiles locally!
 ```bash
-cargo install --git https://github.com/Chronos778/git-rewind.git
+cargo install git-rewind
 ```
 
 ### Option 3: Manual Pre-compiled Binaries
