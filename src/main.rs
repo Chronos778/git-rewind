@@ -2,7 +2,7 @@ mod ai;
 mod git;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
@@ -14,6 +14,38 @@ struct Args {
     /// Print raw repository state without AI analysis
     #[arg(short, long)]
     dry_run: bool,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Update rewind to the latest version from GitHub
+    Update,
+    /// Configure API keys
+    Config {
+        #[command(subcommand)]
+        action: ConfigCommands,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ConfigCommands {
+    /// Set an API key
+    Set {
+        /// The provider to set the key for (groq, gemini, openai)
+        provider: String,
+        /// The API key
+        key: String,
+    },
+    /// Clear an API key
+    Clear {
+        /// The provider to clear the key for (groq, gemini, openai)
+        provider: String,
+    },
+    /// Show configured API keys (redacted)
+    Show,
 }
 
 #[tokio::main]
@@ -22,6 +54,18 @@ async fn main() -> Result<()> {
     let _ = colored::control::set_virtual_terminal(true);
 
     let args = Args::parse();
+
+    match args.command {
+        Some(Commands::Update) => {
+            update_binary()?;
+            return Ok(());
+        }
+        Some(Commands::Config { action }) => {
+            ai::handle_config_command(action)?;
+            return Ok(());
+        }
+        None => {}
+    }
 
     // 1. Check if git repo and get state
     let repo_state = git::get_repo_state()?;
@@ -36,7 +80,10 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    // 2. Fetch AI summary with a spinner
+    // 2. Ensure API keys are configured before starting the loading spinner
+    ai::ensure_configured()?;
+
+    // 3. Fetch AI summary with a spinner
     let pb = ProgressBar::new_spinner();
     pb.enable_steady_tick(Duration::from_millis(120));
     pb.set_style(
@@ -59,5 +106,25 @@ async fn main() -> Result<()> {
     println!("{}", summary);
     println!("\n{}", "─".repeat(60).bright_black());
 
+    Ok(())
+}
+
+fn update_binary() -> Result<()> {
+    println!("Checking for updates...");
+    let status = self_update::backends::github::Update::configure()
+        .repo_owner("Chronos778")
+        .repo_name("git-rewind")
+        .bin_name("rewind")
+        .show_download_progress(true)
+        .current_version(self_update::cargo_crate_version!())
+        .build()?
+        .update()?;
+    
+    if status.updated() {
+        println!("{} Updated successfully to version {}!", "✅".green(), status.version());
+    } else {
+        println!("{} You are already running the latest version ({}).", "✅".green(), status.version());
+    }
+    
     Ok(())
 }

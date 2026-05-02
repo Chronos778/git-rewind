@@ -1,5 +1,6 @@
 use crate::git::RepoState;
 use anyhow::{Context, Result};
+use colored::*;
 use directories::ProjectDirs;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -30,6 +31,54 @@ fn load_config() -> Config {
     Config::default()
 }
 
+pub fn handle_config_command(action: crate::ConfigCommands) -> Result<()> {
+    let mut config = load_config();
+
+    match action {
+        crate::ConfigCommands::Set { provider, key } => {
+            match provider.to_lowercase().as_str() {
+                "groq" => config.groq_api_key = Some(key.clone()),
+                "gemini" => config.gemini_api_key = Some(key.clone()),
+                "openai" => config.openai_api_key = Some(key.clone()),
+                _ => anyhow::bail!("Unknown provider: {}. Supported providers are: groq, gemini, openai.", provider),
+            }
+            save_config(&config)?;
+            println!("{} API key for {} has been set.", "✅".green(), provider);
+        }
+        crate::ConfigCommands::Clear { provider } => {
+            match provider.to_lowercase().as_str() {
+                "groq" => config.groq_api_key = None,
+                "gemini" => config.gemini_api_key = None,
+                "openai" => config.openai_api_key = None,
+                _ => anyhow::bail!("Unknown provider: {}. Supported providers are: groq, gemini, openai.", provider),
+            }
+            save_config(&config)?;
+            println!("{} API key for {} has been cleared.", "✅".green(), provider);
+        }
+        crate::ConfigCommands::Show => {
+            println!("{} \n", "--- Configured API Keys ---".bold());
+            if let Some(key) = &config.groq_api_key {
+                println!("{}: {}", "Groq".green(), format!("{}...", &key[..std::cmp::min(10, key.len())]));
+            } else {
+                println!("{}: Not set", "Groq".bright_black());
+            }
+
+            if let Some(key) = &config.gemini_api_key {
+                println!("{}: {}", "Gemini".green(), format!("{}...", &key[..std::cmp::min(10, key.len())]));
+            } else {
+                println!("{}: Not set", "Gemini".bright_black());
+            }
+
+            if let Some(key) = &config.openai_api_key {
+                println!("{}: {}", "OpenAI".green(), format!("{}...", &key[..std::cmp::min(10, key.len())]));
+            } else {
+                println!("{}: Not set", "OpenAI".bright_black());
+            }
+        }
+    }
+    Ok(())
+}
+
 fn save_config(config: &Config) -> Result<()> {
     if let Some(path) = get_config_path() {
         if let Some(parent) = path.parent() {
@@ -53,11 +102,51 @@ Focus on the 'why' and 'what' of the changes. \
 Do not output markdown code blocks unless it's a specific shell command they should run. \
 Make it sound like a helpful colleague bringing them up to speed.";
 
-pub async fn analyze_repo(state: &RepoState) -> Result<String> {
+pub fn ensure_configured() -> Result<()> {
     let mut config = load_config();
 
+    // Check Env Vars or Config File
+    if env::var("GROQ_API_KEY").is_ok() || env::var("GEMINI_API_KEY").is_ok() || env::var("OPENAI_API_KEY").is_ok() {
+        return Ok(());
+    }
+    if config.groq_api_key.is_some() || config.gemini_api_key.is_some() || config.openai_api_key.is_some() {
+        return Ok(());
+    }
+
+    println!("Welcome to Rewind. First-time setup required.");
+    println!("Please enter your preferred API key (Groq, Gemini, or OpenAI supported).");
+    print!("API Key: ");
+    io::stdout().flush()?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let key = input.trim().to_string();
+
+    if key.is_empty() {
+        anyhow::bail!("No API key provided. Exiting.");
+    }
+
+    // Auto-detect based on key prefix
+    if key.starts_with("gsk_") {
+        println!("Provider detected: Groq. Saving configuration...\n");
+        config.groq_api_key = Some(key.clone());
+    } else if key.starts_with("AIza") {
+        println!("Provider detected: Gemini. Saving configuration...\n");
+        config.gemini_api_key = Some(key.clone());
+    } else {
+        println!("Provider detected: OpenAI. Saving configuration...\n");
+        config.openai_api_key = Some(key.clone());
+    }
+    
+    let _ = save_config(&config);
+    Ok(())
+}
+
+pub async fn analyze_repo(state: &RepoState) -> Result<String> {
+    let config = load_config();
+
     // Auto-detect provider based on available keys.
-    // Order of precedence: Env Vars -> Config File -> Prompt New User
+    // Order of precedence: Env Vars -> Config File
 
     let mut configured_key = None;
 
@@ -74,39 +163,6 @@ pub async fn analyze_repo(state: &RepoState) -> Result<String> {
         configured_key = Some(("GEMINI", key));
     } else if let Some(key) = config.openai_api_key.clone() {
         configured_key = Some(("OPENAI", key));
-    }
-
-    // 2. If absolutely no key is found, prompt the user globally (First-time setup)
-    if configured_key.is_none() {
-        println!("Welcome to Rewind. First-time setup required.");
-        println!("Please enter your preferred API key (Groq, Gemini, or OpenAI supported).");
-        print!("API Key: ");
-        io::stdout().flush()?;
-
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        let key = input.trim().to_string();
-
-        if key.is_empty() {
-            anyhow::bail!("No API key provided. Exiting.");
-        }
-
-        // Auto-detect based on key prefix
-        if key.starts_with("gsk_") {
-            println!("Provider detected: Groq. Saving configuration...");
-            config.groq_api_key = Some(key.clone());
-            configured_key = Some(("GROQ", key));
-        } else if key.starts_with("AIza") {
-            println!("Provider detected: Gemini. Saving configuration...");
-            config.gemini_api_key = Some(key.clone());
-            configured_key = Some(("GEMINI", key));
-        } else {
-            println!("Provider detected: OpenAI. Saving configuration...");
-            config.openai_api_key = Some(key.clone());
-            configured_key = Some(("OPENAI", key));
-        }
-        
-        let _ = save_config(&config);
     }
 
     // 3. Map to specific endpoints based on detected provider

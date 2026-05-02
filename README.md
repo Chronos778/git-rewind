@@ -40,9 +40,25 @@ cargo install --git https://github.com/Chronos778/git-rewind.git
 2. Download the archive for your operating system (`.zip` for Windows, `.tar.gz` for macOS/Linux).
 3. Extract the `rewind` executable and add it to your PATH manually.
 
-## Configuration
+## Configuration & Commands
 
-`rewind` checks your environment variables for keys to several top providers:
+By default, the first time you run `rewind`, it will launch an interactive setup prompting you to paste an API key. 
+You can use the new `config` command to manually add, view, or remove multiple API keys:
+
+```bash
+# View your saved keys (redacted)
+rewind config show
+
+# Add or change a specific provider's key
+rewind config set groq gsk_123456789...
+rewind config set gemini AIzaSyB...
+rewind config set openai sk-proj-...
+
+# Delete a key
+rewind config clear openai
+```
+
+Alternatively, `rewind` checks your environment variables for keys to several top providers:
 
 To use **Groq** (insanely fast, generous free tier):
 ```bash
