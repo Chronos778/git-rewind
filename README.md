@@ -1,5 +1,10 @@
 # Rewind
 
+![Demo](Assets/demo.png)
+![Commit Demo](Assets/commits.png)
+
+<video src="Assets/demo.mp4" controls="controls" width="100%"></video>
+
 An AI-powered CLI tool that instantly tells you where you left off in your Git repository. 
 
 Run it, get briefed. No manual notes, no journals, fully automatic.
