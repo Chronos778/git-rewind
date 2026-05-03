@@ -9,7 +9,13 @@ use std::time::Duration;
 
 /// Rewind - An AI-powered CLI tool that instantly tells you where you left off.
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(
+    author,
+    version,
+    about,
+    long_about = None,
+    after_help = "EXAMPLES:\n  rewind                 Analyze repo, print a brief, and save to .rewind-brief.md\n  rewind -s              Generate a very short 2-sentence summary\n  rewind commit          Generate a commit message based on staged changes\n  rewind ask \"query\"     Ask a specific question about the repository\n"
+)]
 struct Args {
     /// Print raw repository state without AI analysis
     #[arg(short, long)]
