@@ -13,9 +13,7 @@ You work on a feature, switch to a bugfix, leave for the weekend, and come back 
 ## Demo & Screenshots
 
 **Video Demo:**
-<video controls autoplay loop muted>
-  <source src="https://raw.githubusercontent.com/Chronos778/git-rewind/main/Assets/demo.mp4" type="video/mp4">
-</video>
+![Video Demo](Assets/demo.gif)
 
 **Rewind in Action:**
 ![Demo](./Assets/demo.png)
