@@ -1,10 +1,5 @@
 # Rewind
 
-![Demo](Assets/demo.png)
-![Commit Demo](Assets/commits.png)
-
-<video src="Assets/demo.mp4" controls="controls" width="100%"></video>
-
 An AI-powered CLI tool that instantly tells you where you left off in your Git repository. 
 
 Run it, get briefed. No manual notes, no journals, fully automatic.
@@ -14,6 +9,17 @@ You work on a feature, switch to a bugfix, leave for the weekend, and come back 
 
 ## The Solution
 `rewind` analyzes your repository state (branch, recent commits, staged and unstaged changes) and feeds it to an LLM to give you a personalized, conversational briefing on what you were working on and what you left unfinished.
+
+## Demo & Screenshots
+
+**Video Demo:**
+<video src="./Assets/demo.mp4" controls muted></video>
+
+**Rewind in Action:**
+![Demo](./Assets/demo.png)
+
+**Commit Mode:**
+![Commit Demo](./Assets/commits.png)
 
 ## Installation
 
