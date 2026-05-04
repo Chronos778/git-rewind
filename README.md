@@ -28,10 +28,8 @@ You do not need Rust or developer tools installed. These scripts will download t
 
 **Windows (PowerShell):**
 ```powershell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Chronos778/git-rewind/main/install.ps1" -OutFile "$env:TEMP
-ewind_install.ps1"
-powershell -ExecutionPolicy Bypass -File "$env:TEMP
-ewind_install.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Chronos778/git-rewind/main/install.ps1" -OutFile "$env:TEMP\rewind_install.ps1"
+powershell -ExecutionPolicy Bypass -File "$env:TEMP\rewind_install.ps1"
 ```
 *(If Windows Defender says it's "not safe to run" after installation, it's just because the binary is unsigned. Click "More info" -> "Run anyway", or use Option 2 below if you prefer to compile it yourself.)*
 
