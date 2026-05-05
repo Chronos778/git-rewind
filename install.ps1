@@ -14,7 +14,7 @@ try {
 }
 
 $Arch = if ([System.Environment]::Is64BitOperatingSystem) { "x86_64" } else { "i686" }
-$Asset = $Release.assets | Where-Object { $_.name -match "windows" -and $_.name -match "zip" }
+$Asset = $Release.assets | Where-Object { $_.name -match "windows" -and $_.name -match "zip" -and $_.name -match $Arch } | Select-Object -First 1
 
 if (-not $Asset) {
     Write-Host "No Windows binary found in the latest release." -ForegroundColor Red
@@ -24,6 +24,27 @@ if (-not $Asset) {
 $TempZip = "$env:TEMP\rewind.zip"
 Write-Host "Downloading $($Asset.name)..."
 Invoke-WebRequest -Uri $Asset.browser_download_url -OutFile $TempZip -UseBasicParsing
+
+$ChecksumUrl = "$($Asset.browser_download_url).sha256"
+$TempChecksum = "$env:TEMP\rewind.zip.sha256"
+Write-Host "Downloading checksum..."
+try {
+    Invoke-WebRequest -Uri $ChecksumUrl -OutFile $TempChecksum -UseBasicParsing
+    $ExpectedChecksum = (Get-Content $TempChecksum -TotalCount 1).Split(' ')[0].Trim().ToUpper()
+    $ActualChecksum = (Get-FileHash -Path $TempZip -Algorithm SHA256).Hash.ToUpper()
+
+    if ($ExpectedChecksum -ne $ActualChecksum) {
+        Write-Host "Error: Checksum verification failed!" -ForegroundColor Red
+        Write-Host "Expected: $ExpectedChecksum" -ForegroundColor Red
+        Write-Host "Actual:   $ActualChecksum" -ForegroundColor Red
+        Remove-Item $TempZip, $TempChecksum -ErrorAction SilentlyContinue
+        exit 1
+    }
+    Write-Host "Checksum verified successfully." -ForegroundColor Green
+    Remove-Item $TempChecksum -ErrorAction SilentlyContinue
+} catch {
+    Write-Host "Warning: Could not download checksum file. Skipping verification." -ForegroundColor Yellow
+}
 
 $InstallDir = "$env:USERPROFILE\.rewind\bin"
 if (-not (Test-Path $InstallDir)) {

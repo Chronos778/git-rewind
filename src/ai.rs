@@ -149,9 +149,7 @@ pub fn ensure_configured() -> Result<()> {
     print!("API Key: ");
     io::stdout().flush()?;
 
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let key = input.trim().to_string();
+    let key = rpassword::read_password().unwrap_or_default().trim().to_string();
 
     if key.is_empty() {
         anyhow::bail!("No API key provided. Exiting.");

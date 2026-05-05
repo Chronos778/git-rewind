@@ -24,7 +24,7 @@ case "$OS" in
 esac
 
 # Poor man's JSON parsing (assuming standard github API format)
-URL=$(echo "$RELEASE" | grep -o "browser_download_url\": \"[^\"]*" | grep "$OS" | grep "$ARCH" | grep "tar.gz" | cut -d'"' -f3)
+URL=$(echo "$RELEASE" | grep -o "browser_download_url\": \"[^\"]*" | grep "$OS" | grep "$ARCH" | grep "tar.gz" | cut -d'"' -f3 | head -n 1)
 
 if [ -z "$URL" ]; then
     echo "Failed to find a suitable download for $OS-$ARCH."
@@ -36,6 +36,30 @@ TEMP_TAR="$TEMP_DIR/rewind.tar.gz"
 
 echo "Downloading $URL..."
 curl -L -s -o "$TEMP_TAR" "$URL"
+
+echo "Downloading checksum..."
+if curl -L -s -o "$TEMP_TAR.sha256" "$URL.sha256"; then
+    echo "Verifying checksum..."
+    EXPECTED_CHECKSUM=$(cat "$TEMP_TAR.sha256" | awk '{print $1}')
+    if command -v sha256sum >/dev/null 2>&1; then
+        ACTUAL_CHECKSUM=$(sha256sum "$TEMP_TAR" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        ACTUAL_CHECKSUM=$(shasum -a 256 "$TEMP_TAR" | awk '{print $1}')
+    else
+        echo "Warning: Neither sha256sum nor shasum found. Skipping checksum verification."
+        ACTUAL_CHECKSUM=$EXPECTED_CHECKSUM
+    fi
+
+    if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
+        echo "Error: Checksum verification failed!"
+        echo "Expected: $EXPECTED_CHECKSUM"
+        echo "Actual:   $ACTUAL_CHECKSUM"
+        rm -rf "$TEMP_DIR"
+        exit 1
+    fi
+else
+    echo "Warning: Could not download checksum file. Skipping verification."
+fi
 
 INSTALL_DIR="$HOME/.local/bin"
 mkdir -p "$INSTALL_DIR"
