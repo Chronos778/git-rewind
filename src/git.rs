@@ -95,7 +95,7 @@ fn run_git_limited(args: &[&str], limit: usize) -> Result<String> {
         .spawn()
         .context(format!("Failed to run `git {:?}`", args))?;
 
-    let mut stdout = child.stdout.take().expect("Failed to open stdout");
+    let stdout = child.stdout.take().expect("Failed to open stdout");
     let mut buffer = Vec::new();
     stdout.take(limit as u64).read_to_end(&mut buffer)?;
     

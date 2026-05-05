@@ -37,6 +37,19 @@ fn load_config() -> Config {
 pub fn handle_config_command(action: crate::ConfigCommands) -> Result<()> {
     let mut config = load_config();
 
+    fn mask_key(k: &str) -> String {
+        if k.len() <= 8 {
+            return "********".to_string();
+        }
+        let b = k.as_bytes();
+        let n = b.len();
+        format!(
+            "{}{}{}{}...{}{}{}{}",
+            b[0] as char, b[1] as char, b[2] as char, b[3] as char,
+            b[n-4] as char, b[n-3] as char, b[n-2] as char, b[n-1] as char
+        )
+    }
+
     match action {
         crate::ConfigCommands::Set { provider, key } => {
             match provider.to_lowercase().as_str() {
@@ -81,21 +94,21 @@ pub fn handle_config_command(action: crate::ConfigCommands) -> Result<()> {
             println!("{} \n", "[ CONFIGURED API KEYS & MODELS ]".bold());
             if let Some(key) = &config.groq_api_key {
                 let model = config.groq_model.as_deref().unwrap_or("llama-3.3-70b-versatile (default)");
-                println!("{}: {} [Model: {}]", "Groq".green(), format!("{}...", &key[..std::cmp::min(10, key.len())]), model);
+                println!("{}: {} [Model: {}]", "Groq".green(), mask_key(key), model);
             } else {
                 println!("{}: Not set", "Groq".bright_black());
             }
 
             if let Some(key) = &config.gemini_api_key {
                 let model = config.gemini_model.as_deref().unwrap_or("gemini-1.5-flash (default)");
-                println!("{}: {} [Model: {}]", "Gemini".green(), format!("{}...", &key[..std::cmp::min(10, key.len())]), model);
+                println!("{}: {} [Model: {}]", "Gemini".green(), mask_key(key), model);
             } else {
                 println!("{}: Not set", "Gemini".bright_black());
             }
 
             if let Some(key) = &config.openai_api_key {
                 let model = config.openai_model.as_deref().unwrap_or("gpt-4o-mini (default)");
-                println!("{}: {} [Model: {}]", "OpenAI".green(), format!("{}...", &key[..std::cmp::min(10, key.len())]), model);
+                println!("{}: {} [Model: {}]", "OpenAI".green(), mask_key(key), model);
             } else {
                 println!("{}: Not set", "OpenAI".bright_black());
             }
