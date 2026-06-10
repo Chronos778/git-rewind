@@ -101,7 +101,10 @@ mod tests {
     #[test]
     fn test_detect_from_key() {
         assert_eq!(Provider::detect_from_key("gsk_abc123"), Provider::Groq);
-        assert_eq!(Provider::detect_from_key("AIzaSyB_something"), Provider::Gemini);
+        assert_eq!(
+            Provider::detect_from_key("AIzaSyB_something"),
+            Provider::Gemini
+        );
         assert_eq!(Provider::detect_from_key("sk-proj-abc"), Provider::OpenAi);
         // Unknown prefix falls back to OpenAI
         assert_eq!(Provider::detect_from_key("random_key"), Provider::OpenAi);

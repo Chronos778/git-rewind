@@ -57,7 +57,8 @@ impl Config {
 }
 
 fn get_config_path() -> Option<std::path::PathBuf> {
-    ProjectDirs::from("com", "Rewind", "Rewind").map(|proj_dirs| proj_dirs.config_dir().join("config.json"))
+    ProjectDirs::from("com", "Rewind", "Rewind")
+        .map(|proj_dirs| proj_dirs.config_dir().join("config.json"))
 }
 
 pub fn load_config() -> Config {
@@ -90,8 +91,14 @@ fn mask_key(k: &str) -> String {
     let n = b.len();
     format!(
         "{}{}{}{}...{}{}{}{}",
-        b[0] as char, b[1] as char, b[2] as char, b[3] as char,
-        b[n-4] as char, b[n-3] as char, b[n-2] as char, b[n-1] as char
+        b[0] as char,
+        b[1] as char,
+        b[2] as char,
+        b[3] as char,
+        b[n - 4] as char,
+        b[n - 3] as char,
+        b[n - 2] as char,
+        b[n - 1] as char
     )
 }
 
@@ -119,20 +126,33 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
 
             config.set_api_key(p, Some(api_key));
             save_config(&config)?;
-            println!("{} API key for {} has been set.", "[SUCCESS]".green(), p.display_name());
+            println!(
+                "{} API key for {} has been set.",
+                "[SUCCESS]".green(),
+                p.display_name()
+            );
         }
         ConfigCommands::Model { provider, model } => {
             let p = Provider::from_name(&provider)?;
             config.set_model(p, Some(model.clone()));
             save_config(&config)?;
-            println!("{} Custom model '{}' for {} has been set.", "[SUCCESS]".green(), model, p.display_name());
+            println!(
+                "{} Custom model '{}' for {} has been set.",
+                "[SUCCESS]".green(),
+                model,
+                p.display_name()
+            );
         }
         ConfigCommands::Clear { provider } => {
             let p = Provider::from_name(&provider)?;
             config.set_api_key(p, None);
             config.set_model(p, None);
             save_config(&config)?;
-            println!("{} Settings for {} have been cleared.", "[SUCCESS]".green(), p.display_name());
+            println!(
+                "{} Settings for {} have been cleared.",
+                "[SUCCESS]".green(),
+                p.display_name()
+            );
         }
         ConfigCommands::Show => {
             println!("{} \n", "[ CONFIGURED API KEYS & MODELS ]".bold());
@@ -142,7 +162,12 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
                         Some(m) => m.clone(),
                         None => format!("{} (default)", p.default_model()),
                     };
-                    println!("{}: {} [Model: {}]", p.display_name().green(), mask_key(key), model);
+                    println!(
+                        "{}: {} [Model: {}]",
+                        p.display_name().green(),
+                        mask_key(key),
+                        model
+                    );
                 } else {
                     println!("{}: Not set", p.display_name().bright_black());
                 }
@@ -172,14 +197,20 @@ pub fn ensure_configured() -> Result<()> {
     print!("API Key: ");
     io::stdout().flush()?;
 
-    let key = rpassword::read_password().unwrap_or_default().trim().to_string();
+    let key = rpassword::read_password()
+        .unwrap_or_default()
+        .trim()
+        .to_string();
 
     if key.is_empty() {
         anyhow::bail!("No API key provided. Exiting.");
     }
 
     let provider = Provider::detect_from_key(&key);
-    println!("Provider detected: {}. Saving configuration...\n", provider.display_name());
+    println!(
+        "Provider detected: {}. Saving configuration...\n",
+        provider.display_name()
+    );
     config.set_api_key(provider, Some(key));
 
     save_config(&config).context("Failed to save configuration after first-time setup")?;

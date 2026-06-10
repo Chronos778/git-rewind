@@ -35,9 +35,13 @@ fn resolve_provider_and_key(cfg: &config::Config) -> Result<(Provider, String)> 
 }
 
 /// Build an HTTP client and resolve the model for a given provider.
-async fn setup_client(provider: Provider, api_key: &str, cfg: &config::Config) -> Result<(Client, String, String)> {
-    let api_base = env::var("OPENAI_API_BASE")
-        .unwrap_or_else(|_| provider.default_api_base().to_string());
+async fn setup_client(
+    provider: Provider,
+    api_key: &str,
+    cfg: &config::Config,
+) -> Result<(Client, String, String)> {
+    let api_base =
+        env::var("OPENAI_API_BASE").unwrap_or_else(|_| provider.default_api_base().to_string());
 
     let maybe_model = env::var("OPENAI_MODEL")
         .ok()

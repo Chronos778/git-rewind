@@ -1,7 +1,12 @@
 use crate::provider::Provider;
 use reqwest::Client;
 
-pub async fn discover_best_model(client: &Client, api_base: &str, api_key: &str, provider: Provider) -> String {
+pub async fn discover_best_model(
+    client: &Client,
+    api_base: &str,
+    api_key: &str,
+    provider: Provider,
+) -> String {
     let default_fallback = provider.default_model();
 
     let res = match client
@@ -29,7 +34,14 @@ pub async fn discover_best_model(client: &Client, api_base: &str, api_key: &str,
             if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
                 let lower_id = id.to_lowercase();
                 // Filter out non-text utility models
-                if lower_id.contains("embedding") || lower_id.contains("whisper") || lower_id.contains("dall-e") || lower_id.contains("vision") || lower_id.contains("tts") || lower_id.contains("audio") || lower_id.contains("moderation") {
+                if lower_id.contains("embedding")
+                    || lower_id.contains("whisper")
+                    || lower_id.contains("dall-e")
+                    || lower_id.contains("vision")
+                    || lower_id.contains("tts")
+                    || lower_id.contains("audio")
+                    || lower_id.contains("moderation")
+                {
                     continue;
                 }
                 available_models.push(id.to_string());
@@ -43,10 +55,16 @@ pub async fn discover_best_model(client: &Client, api_base: &str, api_key: &str,
 
     match provider {
         Provider::Groq => {
-            if let Some(m) = available_models.iter().find(|m| m.contains("versatile") || (m.contains("llama") && m.contains("70b"))) {
+            if let Some(m) = available_models
+                .iter()
+                .find(|m| m.contains("versatile") || (m.contains("llama") && m.contains("70b")))
+            {
                 return m.clone();
             }
-            if let Some(m) = available_models.iter().find(|m| (m.contains("llama") && m.contains("8b")) || m.contains("mixtral")) {
+            if let Some(m) = available_models
+                .iter()
+                .find(|m| (m.contains("llama") && m.contains("8b")) || m.contains("mixtral"))
+            {
                 return m.clone();
             }
             if let Some(m) = available_models.iter().find(|m| m.contains("llama")) {

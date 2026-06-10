@@ -22,7 +22,7 @@ struct Args {
     /// Print raw repository state without AI analysis
     #[arg(short, long)]
     dry_run: bool,
-    
+
     /// Output the analysis in raw JSON format
     #[arg(short, long)]
     json: bool,
@@ -30,6 +30,14 @@ struct Args {
     /// Generate a very short summary (2-sentence maximum)
     #[arg(short, long)]
     short: bool,
+
+    /// Show diagnostic information (provider, API base, model)
+    #[arg(short, long, global = true)]
+    verbose: bool,
+
+    /// Do not save the brief to .rewind-brief.md
+    #[arg(long)]
+    no_save: bool,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -117,14 +125,29 @@ async fn main() -> Result<()> {
             let chars = prompt.len();
             let words = prompt.split_whitespace().count();
             let approx_tokens = (chars / 4 + (words * 13 / 10)) / 2;
-            println!("{} Approximate Tokens: ~{}", "[ESTIMATE]".green().bold(), approx_tokens);
-            println!("{} Characters: {} | Words: {}", "[ESTIMATE]".green().bold(), chars, words);
-            println!("{} This is a rough estimate. Actual count varies by model and tokenizer.", "[NOTE]".bright_black());
+            println!(
+                "{} Approximate Tokens: ~{}",
+                "[ESTIMATE]".green().bold(),
+                approx_tokens
+            );
+            println!(
+                "{} Characters: {} | Words: {}",
+                "[ESTIMATE]".green().bold(),
+                chars,
+                words
+            );
+            println!(
+                "{} This is a rough estimate. Actual count varies by model and tokenizer.",
+                "[NOTE]".bright_black()
+            );
             return Ok(());
         }
         Some(Commands::Commit) => {
             let repo_state = git::get_repo_state()?;
             config::ensure_configured()?;
+            if args.verbose {
+                print_diagnostics();
+            }
             let pb = make_spinner("Generating commit message...")?;
             let msg = ai::generate_commit_message(&repo_state).await?;
             pb.finish_and_clear();
@@ -134,11 +157,15 @@ async fn main() -> Result<()> {
         Some(Commands::Ask { query }) => {
             let repo_state = git::get_repo_state()?;
             config::ensure_configured()?;
+            if args.verbose {
+                print_diagnostics();
+            }
             let pb = make_spinner("Thinking...")?;
             let answer = ai::ask_question_streaming(&repo_state, &query, move || {
                 pb.finish_and_clear();
                 println!();
-            }).await?;
+            })
+            .await?;
             println!("\n");
             let _ = answer; // response already printed via streaming
             return Ok(());
@@ -161,6 +188,9 @@ async fn main() -> Result<()> {
 
     // 2. Ensure API keys are configured before starting the loading spinner
     config::ensure_configured()?;
+    if args.verbose {
+        print_diagnostics();
+    }
 
     // 3. Fetch AI summary
     if args.short || args.json {
@@ -180,7 +210,9 @@ async fn main() -> Result<()> {
             println!("\n{}", "─".repeat(60).bright_black());
         }
 
-        save_brief(&summary);
+        if !args.no_save {
+            save_brief(&summary);
+        }
     } else {
         // Streaming mode — tokens print live as they arrive
         let pb = make_spinner("Analyzing repository and generating brief...")?;
@@ -188,19 +220,59 @@ async fn main() -> Result<()> {
             pb.finish_and_clear();
             println!("\n{}", "[ REPOSITORY BRIEF ]".bold());
             println!("{}", "─".repeat(60).bright_black());
-        }).await?;
+        })
+        .await?;
         println!("\n{}", "─".repeat(60).bright_black());
 
-        save_brief(&summary);
+        if !args.no_save {
+            save_brief(&summary);
+        }
     }
 
     Ok(())
 }
 
+/// Print diagnostic information about the configured provider, API base, and model.
+fn print_diagnostics() {
+    let cfg = config::load_config();
+
+    let resolved = provider::Provider::all().iter().find_map(|&p| {
+        if std::env::var(p.env_key_name()).is_ok() {
+            Some((p, "environment variable"))
+        } else if cfg.get_api_key(p).is_some() {
+            Some((p, "config file"))
+        } else {
+            None
+        }
+    });
+
+    if let Some((p, source)) = resolved {
+        let api_base =
+            std::env::var("OPENAI_API_BASE").unwrap_or_else(|_| p.default_api_base().to_string());
+        let model = std::env::var("OPENAI_MODEL")
+            .ok()
+            .or_else(|| cfg.get_model(p).cloned())
+            .unwrap_or_else(|| format!("{} (auto-discover)", p.default_model()));
+
+        eprintln!(
+            "{} Provider: {} (from {})",
+            "[VERBOSE]".bright_black(),
+            p.display_name(),
+            source
+        );
+        eprintln!("{} API Base: {}", "[VERBOSE]".bright_black(), api_base);
+        eprintln!("{} Model: {}", "[VERBOSE]".bright_black(), model);
+    } else {
+        eprintln!("{} No provider configured", "[VERBOSE]".bright_black());
+    }
+}
+
 /// Save the brief to `.rewind-brief.md` and add it to `.gitignore`.
 fn save_brief(summary: &str) {
     let brief_filename = ".rewind-brief.md";
-    let Ok(cwd) = std::env::current_dir() else { return };
+    let Ok(cwd) = std::env::current_dir() else {
+        return;
+    };
     let brief_path = cwd.join(brief_filename);
 
     let file_content = format!(
@@ -210,7 +282,11 @@ fn save_brief(summary: &str) {
 
     match std::fs::write(&brief_path, file_content) {
         Ok(()) => {
-            println!("{} Brief automatically saved to: {}", "[INFO]".cyan(), brief_filename.bold());
+            println!(
+                "{} Brief automatically saved to: {}",
+                "[INFO]".cyan(),
+                brief_filename.bold()
+            );
 
             // Add to gitignore if it exists and isn't already there
             let gitignore_path = cwd.join(".gitignore");
@@ -218,7 +294,10 @@ fn save_brief(summary: &str) {
                 if let Ok(gitignore_content) = std::fs::read_to_string(&gitignore_path) {
                     if !gitignore_content.contains(brief_filename) {
                         use std::io::Write;
-                        if let Ok(mut file) = std::fs::OpenOptions::new().append(true).open(&gitignore_path) {
+                        if let Ok(mut file) = std::fs::OpenOptions::new()
+                            .append(true)
+                            .open(&gitignore_path)
+                        {
                             let _ = writeln!(file, "\n# Rewind\n{}", brief_filename);
                         }
                     }
@@ -226,7 +305,12 @@ fn save_brief(summary: &str) {
             }
         }
         Err(e) => {
-            eprintln!("{} Failed to save brief to {}: {}", "[WARN]".yellow(), brief_filename, e);
+            eprintln!(
+                "{} Failed to save brief to {}: {}",
+                "[WARN]".yellow(),
+                brief_filename,
+                e
+            );
         }
     }
 }
@@ -243,9 +327,17 @@ fn update_binary() -> Result<()> {
         .update()?;
 
     if status.updated() {
-        println!("{} Updated successfully to version {}.", "[SUCCESS]".green(), status.version());
+        println!(
+            "{} Updated successfully to version {}.",
+            "[SUCCESS]".green(),
+            status.version()
+        );
     } else {
-        println!("{} You are already running the latest version ({}).", "[INFO]".cyan(), status.version());
+        println!(
+            "{} You are already running the latest version ({}).",
+            "[INFO]".cyan(),
+            status.version()
+        );
     }
 
     Ok(())
@@ -256,7 +348,10 @@ fn uninstall_binary() -> Result<()> {
 
     // 1. Remove config
     config::clear_all_data();
-    println!("{} Removed configuration and local data.", "[SUCCESS]".green());
+    println!(
+        "{} Removed configuration and local data.",
+        "[SUCCESS]".green()
+    );
 
     // 2. Remove binary
     let exe = std::env::current_exe()?;
@@ -266,14 +361,21 @@ fn uninstall_binary() -> Result<()> {
         if std::fs::remove_file(&exe).is_ok() {
             println!("{} Removed executable.", "[SUCCESS]".green());
         } else {
-            println!("{} Please remove the executable manually: rm \"{}\"", "[INFO]".cyan(), exe.display());
+            println!(
+                "{} Please remove the executable manually: rm \"{}\"",
+                "[INFO]".cyan(),
+                exe.display()
+            );
         }
     }
 
     #[cfg(target_os = "windows")]
     {
         // Windows holds a lock on the currently running executable, so we just instruct the user.
-        println!("{} To complete uninstallation, please delete the executable manually by running:", "[INFO]".cyan());
+        println!(
+            "{} To complete uninstallation, please delete the executable manually by running:",
+            "[INFO]".cyan()
+        );
         println!("    del \"{}\"", exe.display());
     }
 

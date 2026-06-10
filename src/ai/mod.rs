@@ -11,10 +11,14 @@ pub use prompts::build_user_prompt;
 pub async fn analyze_repo(state: &RepoState, short: bool, json_format: bool) -> Result<String> {
     let mut actual_system_prompt = prompts::SYSTEM_PROMPT.to_string();
     if short {
-        actual_system_prompt.push_str("\n\nConstraint: Your response MUST be extremely short. 2 sentences maximum.");
+        actual_system_prompt.push_str(
+            "\n\nConstraint: Your response MUST be extremely short. 2 sentences maximum.",
+        );
     }
     if json_format {
-        actual_system_prompt.push_str("\n\nConstraint: Output only raw plaintext without formatting. Do not use code blocks.");
+        actual_system_prompt.push_str(
+            "\n\nConstraint: Output only raw plaintext without formatting. Do not use code blocks.",
+        );
     }
     let user_prompt = prompts::build_user_prompt(state);
     client::api_call(&actual_system_prompt, &user_prompt).await
@@ -38,7 +42,11 @@ pub async fn ask_question_streaming(
     on_first_token: impl FnOnce(),
 ) -> Result<String> {
     let system_prompt = "You are an expert AI pair programmer embedded in the user's terminal. Answer the user's question accurately based on their current repository state and diffs.";
-    let user_prompt = format!("{}\n\nUser Question:\n{}", prompts::build_user_prompt(state), query);
+    let user_prompt = format!(
+        "{}\n\nUser Question:\n{}",
+        prompts::build_user_prompt(state),
+        query
+    );
     client::api_call_streaming(system_prompt, &user_prompt, on_first_token).await
 }
 

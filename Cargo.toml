@@ -2,6 +2,7 @@
 name = "git-rewind"
 version = "1.1.4"
 edition = "2021"
+rust-version = "1.74"
 authors = ["Chronos778"]
 description = "An AI-powered CLI tool that analyzes a git repository and instantly tells you where you left off."
 repository = "https://github.com/Chronos778/git-rewind"
@@ -9,6 +10,8 @@ license = "MIT"
 keywords = ["git", "ai", "openai", "cli", "productivity"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
+homepage = "https://github.com/Chronos778/git-rewind"
+exclude = ["/Assets", "/.github", ".rewind-brief.md"]
 
 [[bin]]
 name = "rewind"
