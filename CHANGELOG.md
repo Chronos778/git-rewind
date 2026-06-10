@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1](https://github.com/Chronos778/git-rewind/compare/v1.2.0...v1.2.1) - 2026-06-10
+
+### Other
+
+- add manual trigger to binary release workflow
+
 ## [1.2.0](https://github.com/Chronos778/git-rewind/compare/v1.1.4...v1.2.0) - 2026-06-10
 
 ### Added
