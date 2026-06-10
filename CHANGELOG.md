@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2](https://github.com/Chronos778/git-rewind/compare/v1.2.1...v1.2.2) - 2026-06-10
+
+### Fixed
+
+- prevent install scripts from downloading checksum files as binaries
+
+### Other
+
+- update README with v2.0 feature descriptions
+
 ## [1.2.1](https://github.com/Chronos778/git-rewind/compare/v1.2.0...v1.2.1) - 2026-06-10
 
 ### Other
