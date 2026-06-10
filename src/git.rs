@@ -2,6 +2,9 @@ use anyhow::{Context, Result};
 use std::process::Command;
 use std::fs;
 
+/// Maximum number of bytes to read from a git diff output.
+const MAX_GIT_DIFF_BYTES: usize = 15_000;
+
 pub struct RepoState {
     pub branch: String,
     pub status: String,
@@ -56,8 +59,8 @@ pub fn get_repo_state() -> Result<RepoState> {
     let branch = run_git(&["branch", "--show-current"])?;
     let status = run_git(&["status", "--short", "--branch"])?;
     let log = run_git(&["log", "-n", "5", "--oneline"])?;
-    let diff = run_git_limited(&diff_args_uncached, 15000)?; 
-    let diff_cached = run_git_limited(&diff_args_cached, 15000)?;
+    let diff = run_git_limited(&diff_args_uncached, MAX_GIT_DIFF_BYTES)?; 
+    let diff_cached = run_git_limited(&diff_args_cached, MAX_GIT_DIFF_BYTES)?;
 
     Ok(RepoState {
         branch,
@@ -74,10 +77,13 @@ fn run_git(args: &[&str]) -> Result<String> {
         .output()
         .context(format!("Failed to run `git {:?}`", args))?;
 
-    // Security/Robustness: Check if command actually succeeded, otherwise log might silently fail
-    // In new repos, git log returns 128 "no commits yet", which we can treat as empty text.
+    // In new repos, git log returns exit code 128 ("no commits yet"), which we treat as empty output.
+    // For other commands, a non-zero exit is unexpected and worth warning about.
     if !output.status.success() && args[0] != "log" {
-        // Silently ignore non-zero exits for commands like git branch in empty repos
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if !stderr.trim().is_empty() {
+            eprintln!("[WARN] `git {}` exited with {}: {}", args.join(" "), output.status, stderr.trim());
+        }
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();

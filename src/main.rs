@@ -1,4 +1,5 @@
 mod ai;
+mod config;
 mod git;
 
 use anyhow::Result;
@@ -53,13 +54,13 @@ enum Commands {
 }
 
 #[derive(Subcommand, Debug)]
-enum ConfigCommands {
-    /// Set an API key
+pub enum ConfigCommands {
+    /// Set an API key (omit the key to enter it securely via hidden prompt)
     Set {
         /// The provider to set the key for (groq, gemini, openai)
         provider: String,
-        /// The API key
-        key: String,
+        /// The API key (optional — omit to enter securely without exposing in shell history)
+        key: Option<String>,
     },
     /// Set a custom model for a provider (e.g. if a default model is decommissioned)
     Model {
@@ -94,7 +95,7 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(Commands::Config { action }) => {
-            ai::handle_config_command(action)?;
+            config::handle_config_command(action)?;
             return Ok(());
         }
         Some(Commands::Estimate) => {
@@ -107,7 +108,7 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Commit) => {
             let repo_state = git::get_repo_state()?;
-            ai::ensure_configured()?;
+            config::ensure_configured()?;
             let pb = ProgressBar::new_spinner();
             pb.enable_steady_tick(Duration::from_millis(120));
             pb.set_style(ProgressStyle::default_spinner().template("{spinner:.blue} Generating commit message...")?);
@@ -118,7 +119,7 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Ask { query }) => {
             let repo_state = git::get_repo_state()?;
-            ai::ensure_configured()?;
+            config::ensure_configured()?;
             let pb = ProgressBar::new_spinner();
             pb.enable_steady_tick(Duration::from_millis(120));
             pb.set_style(ProgressStyle::default_spinner().template("{spinner:.blue} Thinking...")?);
@@ -144,7 +145,7 @@ async fn main() -> Result<()> {
     }
 
     // 2. Ensure API keys are configured before starting the loading spinner
-    ai::ensure_configured()?;
+    config::ensure_configured()?;
 
     // 3. Fetch AI summary with a spinner
     let pb = ProgressBar::new_spinner();
@@ -167,17 +168,17 @@ async fn main() -> Result<()> {
         let json_output = serde_json::json!({
             "brief": summary.trim()
         });
-        println!("{}", json_output.to_string());
+        println!("{}", json_output);
         return Ok(());
     }
 
-    // 3. Output result
+    // 4. Output result
     println!("\n{}", "[ REPOSITORY BRIEF ]".bold());
     println!("{}\n", "─".repeat(60).bright_black());
     println!("{}", summary);
     println!("\n{}", "─".repeat(60).bright_black());
 
-    // 4. Save brief to file
+    // 5. Save brief to file
     let brief_filename = ".rewind-brief.md";
     let brief_path = std::env::current_dir()?.join(brief_filename);
     
@@ -187,20 +188,25 @@ async fn main() -> Result<()> {
         summary
     );
     
-    if std::fs::write(&brief_path, file_content).is_ok() {
-        println!("{} Brief automatically saved to: {}", "[INFO]".cyan(), brief_filename.bold());
-        
-        // Add to gitignore if it exists and isn't already there
-        let gitignore_path = std::env::current_dir()?.join(".gitignore");
-        if gitignore_path.exists() {
-            if let Ok(gitignore_content) = std::fs::read_to_string(&gitignore_path) {
-                if !gitignore_content.contains(brief_filename) {
-                    use std::io::Write;
-                    if let Ok(mut file) = std::fs::OpenOptions::new().append(true).open(&gitignore_path) {
-                        let _ = writeln!(file, "\n# Rewind\n{}", brief_filename);
+    match std::fs::write(&brief_path, file_content) {
+        Ok(()) => {
+            println!("{} Brief automatically saved to: {}", "[INFO]".cyan(), brief_filename.bold());
+            
+            // Add to gitignore if it exists and isn't already there
+            let gitignore_path = std::env::current_dir()?.join(".gitignore");
+            if gitignore_path.exists() {
+                if let Ok(gitignore_content) = std::fs::read_to_string(&gitignore_path) {
+                    if !gitignore_content.contains(brief_filename) {
+                        use std::io::Write;
+                        if let Ok(mut file) = std::fs::OpenOptions::new().append(true).open(&gitignore_path) {
+                            let _ = writeln!(file, "\n# Rewind\n{}", brief_filename);
+                        }
                     }
                 }
             }
+        }
+        Err(e) => {
+            eprintln!("{} Failed to save brief to {}: {}", "[WARN]".yellow(), brief_filename, e);
         }
     }
 
@@ -231,7 +237,7 @@ fn uninstall_binary() -> Result<()> {
     println!("{}", "Uninstalling Rewind...".bold());
     
     // 1. Remove config
-    ai::clear_all_data();
+    config::clear_all_data();
     println!("{} Removed configuration and local data.", "[SUCCESS]".green());
     
     // 2. Remove binary
