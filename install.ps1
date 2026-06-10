@@ -14,7 +14,7 @@ try {
 }
 
 $Arch = if ([System.Environment]::Is64BitOperatingSystem) { "x86_64" } else { "i686" }
-$Asset = $Release.assets | Where-Object { $_.name -match "windows" -and $_.name -match "zip" -and $_.name -match $Arch } | Select-Object -First 1
+$Asset = $Release.assets | Where-Object { $_.name -match "windows" -and $_.name -match '\.zip$' -and $_.name -match $Arch } | Select-Object -First 1
 
 if (-not $Asset) {
     Write-Host "No Windows binary found in the latest release." -ForegroundColor Red

@@ -24,7 +24,7 @@ case "$OS" in
 esac
 
 # Poor man's JSON parsing (assuming standard github API format)
-URL=$(echo "$RELEASE" | grep -o "browser_download_url\": \"[^\"]*" | grep "$OS" | grep "$ARCH" | grep "tar.gz" | cut -d'"' -f3 | head -n 1)
+URL=$(echo "$RELEASE" | grep -o "browser_download_url\": \"[^\"]*" | grep "$OS" | grep "$ARCH" | grep "\.tar\.gz$" | cut -d'"' -f3 | head -n 1)
 
 if [ -z "$URL" ]; then
     echo "Failed to find a suitable download for $OS-$ARCH."
