@@ -161,19 +161,24 @@ rewind --short
 # Output raw JSON for scripts to consume
 rewind --json
 
-# See exactly what raw Git data is being sent to the AI (skips API call)
+# See the exact raw LLM prompt that is generated (skips API call)
 rewind --dry-run
+
+# Enable verbose mode to see exact API token usage telemetry and diagnostic info
+rewind -v
 ```
 
 ### Excluding Files (`.rewindignore`)
-If you have massive auto-generated files (like `package-lock.json` or compiled assets) that your `.gitignore` might miss but you want to hide from the AI to save tokens, create a `.rewindignore` file in your repository:
+By default, `rewind` automatically excludes security files (`.env`, `*.key`) and massive dependency lockfiles (`Cargo.lock`, `package-lock.json`, etc.) to save your tokens. 
+
+If you have other auto-generated files or specific folders you want to hide from the AI, you can create a `.rewindignore` file in your repository:
 ```text
 # Example .rewindignore
-yarn.lock
-Cargo.lock
 dist/
 *.svg
 ```
+
+**Global Ignore:** You can also create a `.rewindignore` file in your home directory (`~/.rewindignore`) and those rules will be applied globally across all your repositories!
 
 ### Maintenance Commands
 
