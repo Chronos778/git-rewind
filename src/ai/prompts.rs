@@ -59,3 +59,74 @@ pub fn truncate_lines(s: &str, max_bytes: usize) -> String {
 
     truncated.trim_end().to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_truncate_lines_short_string() {
+        let input = "hello\nworld";
+        assert_eq!(truncate_lines(input, 100), input);
+    }
+
+    #[test]
+    fn test_truncate_lines_exact_boundary() {
+        let input = "hello\nworld\n"; // 12 bytes
+        assert_eq!(truncate_lines(input, 12), "hello\nworld");
+    }
+
+    #[test]
+    fn test_truncate_lines_triggers_truncation() {
+        let input = "line1\nline2\nline3\nline4\nline5";
+        let result = truncate_lines(input, 12);
+        assert!(result.contains("line1"));
+        assert!(result.contains("line2"));
+        assert!(result.contains("[Diff truncated"));
+        assert!(!result.contains("line5"));
+    }
+
+    #[test]
+    fn test_truncate_lines_empty_string() {
+        assert_eq!(truncate_lines("", 100), "");
+    }
+
+    #[test]
+    fn test_truncate_lines_single_long_line() {
+        let input = "a".repeat(200);
+        let result = truncate_lines(&input, 50);
+        assert!(result.contains("[Diff truncated"));
+    }
+
+    #[test]
+    fn test_build_user_prompt_basic() {
+        let state = RepoState {
+            branch: "main".to_string(),
+            status: "## main".to_string(),
+            log: "abc1234 initial commit".to_string(),
+            diff: String::new(),
+            diff_cached: String::new(),
+        };
+        let prompt = build_user_prompt(&state);
+        assert!(prompt.contains("Branch: main"));
+        assert!(prompt.contains("abc1234"));
+        assert!(!prompt.contains("Staged Changes"));
+        assert!(!prompt.contains("Unstaged Changes"));
+    }
+
+    #[test]
+    fn test_build_user_prompt_with_diffs() {
+        let state = RepoState {
+            branch: "feature".to_string(),
+            status: "M src/lib.rs".to_string(),
+            log: "def5678 add feature".to_string(),
+            diff: "+new line".to_string(),
+            diff_cached: "+staged line".to_string(),
+        };
+        let prompt = build_user_prompt(&state);
+        assert!(prompt.contains("Staged Changes"));
+        assert!(prompt.contains("+staged line"));
+        assert!(prompt.contains("Unstaged Changes"));
+        assert!(prompt.contains("+new line"));
+    }
+}

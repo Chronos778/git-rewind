@@ -1,11 +1,8 @@
+use crate::provider::Provider;
 use reqwest::Client;
 
-pub async fn discover_best_model(client: &Client, api_base: &str, api_key: &str, vendor: &str) -> String {
-    let default_fallback = match vendor {
-        "GROQ" => "llama-3.3-70b-versatile",
-        "GEMINI" => "gemini-2.0-flash",
-        _ => "gpt-4o-mini",
-    };
+pub async fn discover_best_model(client: &Client, api_base: &str, api_key: &str, provider: Provider) -> String {
+    let default_fallback = provider.default_model();
 
     let res = match client
         .get(format!("{}/models", api_base))
@@ -31,7 +28,7 @@ pub async fn discover_best_model(client: &Client, api_base: &str, api_key: &str,
         for item in data {
             if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
                 let lower_id = id.to_lowercase();
-                // Filter out non-text/vision utility models
+                // Filter out non-text utility models
                 if lower_id.contains("embedding") || lower_id.contains("whisper") || lower_id.contains("dall-e") || lower_id.contains("vision") || lower_id.contains("tts") || lower_id.contains("audio") || lower_id.contains("moderation") {
                     continue;
                 }
@@ -44,8 +41,8 @@ pub async fn discover_best_model(client: &Client, api_base: &str, api_key: &str,
         return default_fallback.to_string();
     }
 
-    match vendor {
-        "GROQ" => {
+    match provider {
+        Provider::Groq => {
             if let Some(m) = available_models.iter().find(|m| m.contains("versatile") || (m.contains("llama") && m.contains("70b"))) {
                 return m.clone();
             }
@@ -57,7 +54,7 @@ pub async fn discover_best_model(client: &Client, api_base: &str, api_key: &str,
             }
             available_models[0].clone()
         }
-        "GEMINI" => {
+        Provider::Gemini => {
             if let Some(m) = available_models.iter().find(|m| m.contains("flash")) {
                 return m.clone();
             }
@@ -66,7 +63,7 @@ pub async fn discover_best_model(client: &Client, api_base: &str, api_key: &str,
             }
             available_models[0].clone()
         }
-        _ => {
+        Provider::OpenAi => {
             if let Some(m) = available_models.iter().find(|m| m.contains("mini")) {
                 return m.clone();
             }
