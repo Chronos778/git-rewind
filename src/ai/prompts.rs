@@ -73,7 +73,7 @@ mod tests {
     #[test]
     fn test_truncate_lines_exact_boundary() {
         let input = "hello\nworld\n"; // 12 bytes
-        assert_eq!(truncate_lines(input, 12), "hello\nworld");
+        assert_eq!(truncate_lines(input, 12), "hello\nworld\n");
     }
 
     #[test]
