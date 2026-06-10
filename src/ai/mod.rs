@@ -7,8 +7,12 @@ use anyhow::Result;
 
 pub use prompts::build_user_prompt;
 
-/// Analyze the repo state. Uses streaming for normal output, non-streaming for json/short.
-pub async fn analyze_repo(state: &RepoState, short: bool, json_format: bool) -> Result<String> {
+/// Analyze a repository state and return a high-level summary along with token usage telemetry.
+pub async fn analyze_repo(
+    state: &RepoState,
+    short: bool,
+    json_format: bool,
+) -> Result<(String, Option<(u32, u32)>)> {
     let mut actual_system_prompt = prompts::SYSTEM_PROMPT.to_string();
     if short {
         actual_system_prompt.push_str(
@@ -30,17 +34,17 @@ pub async fn analyze_repo(state: &RepoState, short: bool, json_format: bool) -> 
 pub async fn analyze_repo_streaming(
     state: &RepoState,
     on_first_token: impl FnOnce(),
-) -> Result<String> {
+) -> Result<(String, Option<(u32, u32)>)> {
     let user_prompt = prompts::build_user_prompt(state);
     client::api_call_streaming(prompts::SYSTEM_PROMPT, &user_prompt, on_first_token).await
 }
 
-/// Ask a question, streaming the answer to stdout.
+/// Ask a specific question about the repository state, returning a streaming response and token usage telemetry.
 pub async fn ask_question_streaming(
     state: &RepoState,
     query: &str,
     on_first_token: impl FnOnce(),
-) -> Result<String> {
+) -> Result<(String, Option<(u32, u32)>)> {
     let system_prompt = "You are an expert AI pair programmer embedded in the user's terminal. Answer the user's question accurately based on their current repository state and diffs.";
     let user_prompt = format!(
         "{}\n\nUser Question:\n{}",
@@ -50,8 +54,8 @@ pub async fn ask_question_streaming(
     client::api_call_streaming(system_prompt, &user_prompt, on_first_token).await
 }
 
-/// Generate a commit message (non-streaming — returns the full message).
-pub async fn generate_commit_message(state: &RepoState) -> Result<String> {
+/// Generate a concise commit message based on the current repository diff along with token usage telemetry.
+pub async fn generate_commit_message(state: &RepoState) -> Result<(String, Option<(u32, u32)>)> {
     let system_prompt = "You are an expert developer. Generate a clean, descriptive, and conventional Git commit message based on the provided diff. Output ONLY the commit message. First line should be the subject. Then a blank line, then bullet points for details if needed.";
     let mut user_prompt = String::new();
     if !state.diff_cached.is_empty() {

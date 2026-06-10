@@ -11,8 +11,8 @@ use super::models::discover_best_model;
 /// Maximum number of tokens the AI can return in a single response.
 const MAX_RESPONSE_TOKENS: u32 = 500;
 
-/// HTTP request timeout in seconds.
-const API_TIMEOUT_SECS: u64 = 30;
+/// Maximum API retries.
+const MAX_RETRIES: u32 = 3;
 
 /// Resolve which provider and API key to use.
 /// Priority: env vars first (Groq > Gemini > OpenAI), then config file.
@@ -48,7 +48,8 @@ async fn setup_client(
         .or_else(|| cfg.get_model(provider).cloned());
 
     let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(API_TIMEOUT_SECS))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(120))
         .build()
         .context("Failed to build HTTP client")?;
 
@@ -60,80 +61,129 @@ async fn setup_client(
     Ok((client, api_base, model))
 }
 
-/// Send a non-streaming API call and return the full response.
-pub async fn api_call(system_prompt: &str, user_prompt: &str) -> Result<String> {
+/// Send a non-streaming API call and return the full response along with optional token usage (prompt, completion).
+pub async fn api_call(
+    system_prompt: &str,
+    user_prompt: &str,
+) -> Result<(String, Option<(u32, u32)>)> {
     let cfg = config::load_config();
     let (provider, api_key) = resolve_provider_and_key(&cfg)?;
     let (client, api_base, model) = setup_client(provider, &api_key, &cfg).await?;
 
-    let res = client
-        .post(format!("{}/chat/completions", api_base))
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&json!({
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            "temperature": 0.7,
-            "max_tokens": MAX_RESPONSE_TOKENS,
-        }))
-        .send()
-        .await
-        .context("Failed to connect to the AI API")?;
+    let payload = json!({
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "temperature": 0.7,
+        "max_tokens": MAX_RESPONSE_TOKENS,
+    });
 
-    if !res.status().is_success() {
-        let text = res.text().await?;
-        anyhow::bail!("API returned an error: {}", text);
-    }
+    let mut attempt = 0;
+    let res = loop {
+        attempt += 1;
+        let response = client
+            .post(format!("{}/chat/completions", api_base))
+            .header("Authorization", format!("Bearer {}", api_key))
+            .json(&payload)
+            .send()
+            .await;
+
+        match response {
+            Ok(r) if r.status().is_success() => break r,
+            Ok(r)
+                if attempt < MAX_RETRIES
+                    && (r.status().as_u16() == 429 || r.status().is_server_error()) =>
+            {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                continue;
+            }
+            Ok(r) => anyhow::bail!("API returned an error: {}", r.text().await?),
+            Err(_) if attempt < MAX_RETRIES => {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                continue;
+            }
+            Err(e) => return Err(e).context("Failed to connect to the AI API"),
+        }
+    };
 
     let body: serde_json::Value = res.json().await?;
     let content = body["choices"][0]["message"]["content"]
         .as_str()
         .context("Failed to parse response content")?;
 
-    Ok(content.to_string())
+    let mut usage = None;
+    if let Some(usage_obj) = body.get("usage") {
+        if let (Some(p), Some(c)) = (
+            usage_obj.get("prompt_tokens").and_then(|v| v.as_u64()),
+            usage_obj.get("completion_tokens").and_then(|v| v.as_u64()),
+        ) {
+            usage = Some((p as u32, c as u32));
+        }
+    }
+
+    Ok((content.to_string(), usage))
 }
 
 /// Send a streaming API call, printing tokens to stdout as they arrive.
 /// Calls `on_first_token` exactly once when the first content token is received
 /// (useful for clearing a spinner before output begins).
-/// Returns the full accumulated response.
+/// Returns the full accumulated response and optional token usage (prompt, completion).
 pub async fn api_call_streaming(
     system_prompt: &str,
     user_prompt: &str,
     on_first_token: impl FnOnce(),
-) -> Result<String> {
+) -> Result<(String, Option<(u32, u32)>)> {
     let cfg = config::load_config();
     let (provider, api_key) = resolve_provider_and_key(&cfg)?;
     let (client, api_base, model) = setup_client(provider, &api_key, &cfg).await?;
 
-    let mut res = client
-        .post(format!("{}/chat/completions", api_base))
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&json!({
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            "temperature": 0.7,
-            "max_tokens": MAX_RESPONSE_TOKENS,
-            "stream": true,
-        }))
-        .send()
-        .await
-        .context("Failed to connect to the AI API")?;
+    let payload = json!({
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "temperature": 0.7,
+        "max_tokens": MAX_RESPONSE_TOKENS,
+        "stream": true,
+        "stream_options": {"include_usage": true}
+    });
 
-    if !res.status().is_success() {
-        let text = res.text().await?;
-        anyhow::bail!("API returned an error: {}", text);
-    }
+    let mut attempt = 0;
+    let mut res = loop {
+        attempt += 1;
+        let response = client
+            .post(format!("{}/chat/completions", api_base))
+            .header("Authorization", format!("Bearer {}", api_key))
+            .json(&payload)
+            .send()
+            .await;
+
+        match response {
+            Ok(r) if r.status().is_success() => break r,
+            Ok(r)
+                if attempt < MAX_RETRIES
+                    && (r.status().as_u16() == 429 || r.status().is_server_error()) =>
+            {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                continue;
+            }
+            Ok(r) => anyhow::bail!("API returned an error: {}", r.text().await?),
+            Err(_) if attempt < MAX_RETRIES => {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                continue;
+            }
+            Err(e) => return Err(e).context("Failed to connect to the AI API"),
+        }
+    };
 
     let mut full_response = String::new();
     let mut buffer = String::new();
     let mut first_token = true;
     let mut on_first_token = Some(on_first_token);
+    let mut usage = None;
 
     while let Some(chunk) = res.chunk().await? {
         buffer.push_str(&String::from_utf8_lossy(&chunk));
@@ -145,19 +195,39 @@ pub async fn api_call_streaming(
 
             if let Some(data) = line.strip_prefix("data: ") {
                 if data.trim() == "[DONE]" {
-                    return Ok(full_response);
+                    return Ok((full_response, usage));
                 }
                 if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(data) {
-                    if let Some(content) = parsed["choices"][0]["delta"]["content"].as_str() {
-                        if first_token {
-                            if let Some(callback) = on_first_token.take() {
-                                callback();
-                            }
-                            first_token = false;
+                    // Try to extract usage telemetry
+                    if let Some(usage_obj) = parsed
+                        .get("usage")
+                        .or_else(|| parsed.get("x_groq").and_then(|g| g.get("usage")))
+                    {
+                        if let (Some(p), Some(c)) = (
+                            usage_obj.get("prompt_tokens").and_then(|v| v.as_u64()),
+                            usage_obj.get("completion_tokens").and_then(|v| v.as_u64()),
+                        ) {
+                            usage = Some((p as u32, c as u32));
                         }
-                        print!("{}", content);
-                        let _ = std::io::stdout().flush();
-                        full_response.push_str(content);
+                    }
+
+                    if let Some(choices) = parsed.get("choices") {
+                        if let Some(choice) = choices.get(0) {
+                            if let Some(delta) = choice.get("delta") {
+                                if let Some(content) = delta.get("content").and_then(|c| c.as_str())
+                                {
+                                    if first_token {
+                                        if let Some(callback) = on_first_token.take() {
+                                            callback();
+                                        }
+                                        first_token = false;
+                                    }
+                                    print!("{}", content);
+                                    let _ = std::io::stdout().flush();
+                                    full_response.push_str(content);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -169,5 +239,5 @@ pub async fn api_call_streaming(
         callback();
     }
 
-    Ok(full_response)
+    Ok((full_response, usage))
 }

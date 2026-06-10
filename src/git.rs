@@ -41,22 +41,41 @@ fn get_exclusions(repo_root: &str) -> Vec<String> {
         "config.json",
         "Credentials.toml",
         "credentials.json",
+        // Lockfiles (massive and useless for logical context)
+        "Cargo.lock",
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "Gemfile.lock",
+        "poetry.lock",
+        // Minified assets
+        "*.min.js",
+        "*.min.css",
     ];
     for ext in default_excludes {
         exclusions.push(format!(":(exclude){}", ext));
     }
 
-    // Resolve .rewindignore relative to the repo root, not the cwd,
-    // so it works even when running rewind from a subdirectory.
-    let ignore_path = std::path::Path::new(repo_root).join(".rewindignore");
-    if let Ok(content) = fs::read_to_string(ignore_path) {
-        for line in content.lines() {
-            let trimmed = line.trim();
-            if !trimmed.is_empty() && !trimmed.starts_with('#') {
-                exclusions.push(format!(":(exclude){}", trimmed));
+    // Helper closure to read ignore files
+    let mut add_ignores = |path: std::path::PathBuf| {
+        if let Ok(content) = fs::read_to_string(path) {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() && !trimmed.starts_with('#') {
+                    exclusions.push(format!(":(exclude){}", trimmed));
+                }
             }
         }
+    };
+
+    // 1. Global exclusions (~/.rewindignore)
+    if let Some(home) = directories::UserDirs::new() {
+        add_ignores(home.home_dir().join(".rewindignore"));
     }
+
+    // 2. Repository exclusions (relative to the repo root)
+    add_ignores(std::path::Path::new(repo_root).join(".rewindignore"));
+
     exclusions
 }
 

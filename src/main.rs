@@ -149,9 +149,18 @@ async fn main() -> Result<()> {
                 print_diagnostics();
             }
             let pb = make_spinner("Generating commit message...")?;
-            let msg = ai::generate_commit_message(&repo_state).await?;
+            let (msg, usage) = ai::generate_commit_message(&repo_state).await?;
             pb.finish_and_clear();
             println!("\n{}\n", msg);
+            if let (true, Some((p, c))) = (args.verbose, usage) {
+                println!(
+                    "{} Prompt: {} | Completion: {} | Total: {}",
+                    "[TELEMETRY]".bright_black(),
+                    p,
+                    c,
+                    p + c
+                );
+            }
             return Ok(());
         }
         Some(Commands::Ask { query }) => {
@@ -161,12 +170,21 @@ async fn main() -> Result<()> {
                 print_diagnostics();
             }
             let pb = make_spinner("Thinking...")?;
-            let answer = ai::ask_question_streaming(&repo_state, &query, move || {
+            let (answer, usage) = ai::ask_question_streaming(&repo_state, &query, move || {
                 pb.finish_and_clear();
                 println!();
             })
             .await?;
             println!("\n");
+            if let (true, Some((p, c))) = (args.verbose, usage) {
+                println!(
+                    "{} Prompt: {} | Completion: {} | Total: {}\n",
+                    "[TELEMETRY]".bright_black(),
+                    p,
+                    c,
+                    p + c
+                );
+            }
             let _ = answer; // response already printed via streaming
             return Ok(());
         }
@@ -177,12 +195,11 @@ async fn main() -> Result<()> {
     let repo_state = git::get_repo_state()?;
 
     if args.dry_run {
-        println!("{}", "[ RAW REPOSITORY STATE ]".yellow().bold());
-        println!("{}: {}", "Branch".green(), repo_state.branch);
-        println!("{}:\n{}", "Status".green(), repo_state.status);
-        println!("{}:\n{}", "Log".green(), repo_state.log);
-        println!("{}:\n{}", "Diff (Cached)".green(), repo_state.diff_cached);
-        println!("{}:\n{}", "Diff".green(), repo_state.diff);
+        let prompt = ai::build_user_prompt(&repo_state);
+        println!("{}", "[ DRY RUN: RAW LLM PROMPT ]".yellow().bold());
+        println!("{}", "─".repeat(60).bright_black());
+        println!("{}", prompt);
+        println!("{}", "─".repeat(60).bright_black());
         return Ok(());
     }
 
@@ -196,9 +213,9 @@ async fn main() -> Result<()> {
     if args.short || args.json {
         // Non-streaming mode for --short and --json (need the full response before output)
         let pb = make_spinner("Analyzing repository and generating brief...")?;
-        let summary = ai::analyze_repo(&repo_state, args.short, args.json).await;
+        let result = ai::analyze_repo(&repo_state, args.short, args.json).await;
         pb.finish_and_clear();
-        let summary = summary?;
+        let (summary, usage) = result?;
 
         if args.json {
             let json_output = serde_json::json!({ "brief": summary.trim() });
@@ -210,19 +227,41 @@ async fn main() -> Result<()> {
             println!("\n{}", "─".repeat(60).bright_black());
         }
 
+        if let (true, Some((p, c))) = (args.verbose, usage) {
+            if !args.json {
+                println!(
+                    "{} Prompt: {} | Completion: {} | Total: {}",
+                    "[TELEMETRY]".bright_black(),
+                    p,
+                    c,
+                    p + c
+                );
+            }
+        }
+
         if !args.no_save {
             save_brief(&summary);
         }
     } else {
         // Streaming mode — tokens print live as they arrive
         let pb = make_spinner("Analyzing repository and generating brief...")?;
-        let summary = ai::analyze_repo_streaming(&repo_state, move || {
+        let (summary, usage) = ai::analyze_repo_streaming(&repo_state, move || {
             pb.finish_and_clear();
             println!("\n{}", "[ REPOSITORY BRIEF ]".bold());
             println!("{}", "─".repeat(60).bright_black());
         })
         .await?;
         println!("\n{}", "─".repeat(60).bright_black());
+
+        if let (true, Some((p, c))) = (args.verbose, usage) {
+            println!(
+                "{} Prompt: {} | Completion: {} | Total: {}",
+                "[TELEMETRY]".bright_black(),
+                p,
+                c,
+                p + c
+            );
+        }
 
         if !args.no_save {
             save_brief(&summary);
