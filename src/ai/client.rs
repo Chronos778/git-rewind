@@ -28,7 +28,7 @@ fn resolve_provider_and_key(cfg: &config::Config) -> Result<(Provider, String)> 
     // Fall back to config file
     for &provider in Provider::all() {
         if let Some(key) = cfg.get_api_key(provider) {
-            return Ok((provider, key.expose_secret().clone()));
+            return Ok((provider, key.expose_secret().to_string()));
         }
     }
 
