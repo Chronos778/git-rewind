@@ -388,10 +388,20 @@ fn save_brief(summary: &str, repo_root: &str) {
 
 fn update_binary() -> Result<()> {
     println!("Checking for updates...");
+
+    let target = self_update::get_target();
+    let archive_ext = if cfg!(target_os = "windows") {
+        ".zip"
+    } else {
+        ".tar.gz"
+    };
+    let identifier = format!("{}{}", target, archive_ext);
+
     let status = self_update::backends::github::Update::configure()
         .repo_owner("Chronos778")
         .repo_name("git-rewind")
         .bin_name("rewind")
+        .identifier(&identifier)
         .show_download_progress(true)
         .current_version(self_update::cargo_crate_version!())
         .build()?
