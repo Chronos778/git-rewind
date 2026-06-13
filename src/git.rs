@@ -103,7 +103,8 @@ pub fn get_repo_state() -> Result<RepoState> {
                 if let Ok(oid) = oid {
                     if let Ok(commit) = repo.find_commit(oid) {
                         let id = &commit.id().to_string()[..7];
-                        let summary = commit.summary().unwrap_or("");
+                        let summary_bytes = commit.summary_bytes().unwrap_or(b"");
+                        let summary = String::from_utf8_lossy(summary_bytes);
                         log.push_str(&format!("{} {}\n", id, summary));
                     }
                 }

@@ -693,6 +693,7 @@ dependencies = [
  "clap",
  "colored",
  "directories",
+ "dunce",
  "git2",
  "indicatif",
  "reqwest",

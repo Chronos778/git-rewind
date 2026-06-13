@@ -24,8 +24,11 @@ pub struct CachedModel {
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct Config {
+    #[serde(serialize_with = "serialize_secret", default)]
     pub groq_api_key: Option<SecretString>,
+    #[serde(serialize_with = "serialize_secret", default)]
     pub gemini_api_key: Option<SecretString>,
+    #[serde(serialize_with = "serialize_secret", default)]
     pub openai_api_key: Option<SecretString>,
     pub groq_model: Option<String>,
     pub gemini_model: Option<String>,
@@ -175,6 +178,16 @@ pub fn save_config(config: &Config) -> Result<()> {
         fs::write(path, contents)?;
     }
     Ok(())
+}
+
+fn serialize_secret<S>(secret: &Option<SecretString>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match secret {
+        Some(s) => serializer.serialize_str(s.expose_secret()),
+        None => serializer.serialize_none(),
+    }
 }
 
 fn mask_key(secret: &SecretString) -> String {

@@ -30,3 +30,4 @@ serde_json = "1.0.149"
 tokio = { version = "1.52.1", features = ["full"] }
 git2 = { version = "0.21.0", default-features = false }
 secrecy = { version = "0.10.3", features = ["serde"] }
+dunce = "1.0.5"
