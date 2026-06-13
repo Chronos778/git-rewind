@@ -4,9 +4,22 @@ use anyhow::{Context, Result};
 use colored::*;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::{self, Write};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// How long (seconds) a discovered model is considered fresh. 24 hours.
+const MODEL_CACHE_TTL_SECS: u64 = 86_400;
+
+/// A cached model entry stored in the config file.
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CachedModel {
+    pub model: String,
+    /// Unix timestamp (seconds) when the model was discovered and cached.
+    pub cached_at: u64,
+}
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct Config {
@@ -16,6 +29,9 @@ pub struct Config {
     pub groq_model: Option<String>,
     pub gemini_model: Option<String>,
     pub openai_model: Option<String>,
+    /// Per-provider model cache so `GET /models` is not called on every invocation.
+    #[serde(default)]
+    pub model_cache: HashMap<String, CachedModel>,
 }
 
 impl Config {
@@ -54,6 +70,38 @@ impl Config {
             Provider::OpenAi => self.openai_model = model,
         }
     }
+
+    /// Return the cached model for a provider if it is still within the TTL window.
+    pub fn get_cached_model(&self, provider: Provider) -> Option<String> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        self.model_cache
+            .get(provider.cache_key())
+            .and_then(|entry| {
+                if now.saturating_sub(entry.cached_at) < MODEL_CACHE_TTL_SECS {
+                    Some(entry.model.clone())
+                } else {
+                    None
+                }
+            })
+    }
+
+    /// Store a discovered model in the cache with the current timestamp.
+    pub fn set_cached_model(&mut self, provider: Provider, model: String) {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        self.model_cache.insert(
+            provider.cache_key().to_string(),
+            CachedModel {
+                model,
+                cached_at: now,
+            },
+        );
+    }
 }
 
 fn get_config_path() -> Option<std::path::PathBuf> {
@@ -72,7 +120,7 @@ pub fn load_config() -> Config {
     Config::default()
 }
 
-fn save_config(config: &Config) -> Result<()> {
+pub fn save_config(config: &Config) -> Result<()> {
     if let Some(path) = get_config_path() {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
@@ -206,11 +254,19 @@ pub fn ensure_configured() -> Result<()> {
         anyhow::bail!("No API key provided. Exiting.");
     }
 
-    let provider = Provider::detect_from_key(&key);
-    println!(
-        "Provider detected: {}. Saving configuration...\n",
-        provider.display_name()
-    );
+    let (provider, exact_match) = Provider::detect_from_key(&key);
+    if !exact_match {
+        println!(
+            "{} Key prefix not recognized — assuming {}. If this is wrong, run `rewind config set <provider>`.",
+            "[WARN]".yellow(),
+            provider.display_name()
+        );
+    } else {
+        println!(
+            "Provider detected: {}. Saving configuration...\n",
+            provider.display_name()
+        );
+    }
     config.set_api_key(provider, Some(key));
 
     save_config(&config).context("Failed to save configuration after first-time setup")?;

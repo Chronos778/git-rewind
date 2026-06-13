@@ -9,7 +9,7 @@ use std::io::Write;
 use super::models::discover_best_model;
 
 /// Maximum number of tokens the AI can return in a single response.
-const MAX_RESPONSE_TOKENS: u32 = 500;
+const MAX_RESPONSE_TOKENS: u32 = 1500;
 
 /// Maximum API retries.
 const MAX_RETRIES: u32 = 3;
@@ -35,6 +35,7 @@ fn resolve_provider_and_key(cfg: &config::Config) -> Result<(Provider, String)> 
 }
 
 /// Build an HTTP client and resolve the model for a given provider.
+/// Checks the on-disk model cache (24 h TTL) before calling `GET /models`.
 async fn setup_client(
     provider: Provider,
     api_key: &str,
@@ -55,7 +56,19 @@ async fn setup_client(
 
     let model = match maybe_model {
         Some(m) => m,
-        None => discover_best_model(&client, &api_base, api_key, provider).await,
+        None => {
+            // Serve from cache when fresh — avoids a network round-trip on every run
+            if let Some(cached) = cfg.get_cached_model(provider) {
+                cached
+            } else {
+                let discovered = discover_best_model(&client, &api_base, api_key, provider).await;
+                // Persist to config so the next invocation hits the cache
+                let mut fresh_cfg = config::load_config();
+                fresh_cfg.set_cached_model(provider, discovered.clone());
+                let _ = config::save_config(&fresh_cfg);
+                discovered
+            }
+        }
     };
 
     Ok((client, api_base, model))
@@ -96,12 +109,17 @@ pub async fn api_call(
                 if attempt < MAX_RETRIES
                     && (r.status().as_u16() == 429 || r.status().is_server_error()) =>
             {
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                // Exponential backoff: 1 s, 2 s, 4 s … capped at 30 s
+                let backoff =
+                    std::time::Duration::from_secs(std::cmp::min(1u64 << (attempt - 1), 30));
+                tokio::time::sleep(backoff).await;
                 continue;
             }
             Ok(r) => anyhow::bail!("API returned an error: {}", r.text().await?),
             Err(_) if attempt < MAX_RETRIES => {
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                let backoff =
+                    std::time::Duration::from_secs(std::cmp::min(1u64 << (attempt - 1), 30));
+                tokio::time::sleep(backoff).await;
                 continue;
             }
             Err(e) => return Err(e).context("Failed to connect to the AI API"),
@@ -167,12 +185,17 @@ pub async fn api_call_streaming(
                 if attempt < MAX_RETRIES
                     && (r.status().as_u16() == 429 || r.status().is_server_error()) =>
             {
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                // Exponential backoff: 1 s, 2 s, 4 s … capped at 30 s
+                let backoff =
+                    std::time::Duration::from_secs(std::cmp::min(1u64 << (attempt - 1), 30));
+                tokio::time::sleep(backoff).await;
                 continue;
             }
             Ok(r) => anyhow::bail!("API returned an error: {}", r.text().await?),
             Err(_) if attempt < MAX_RETRIES => {
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                let backoff =
+                    std::time::Duration::from_secs(std::cmp::min(1u64 << (attempt - 1), 30));
+                tokio::time::sleep(backoff).await;
                 continue;
             }
             Err(e) => return Err(e).context("Failed to connect to the AI API"),

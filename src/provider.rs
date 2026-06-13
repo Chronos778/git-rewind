@@ -31,14 +31,16 @@ impl Provider {
         }
     }
 
-    /// Auto-detect provider from an API key prefix.
-    pub fn detect_from_key(key: &str) -> Self {
+    /// Auto-detect provider from an API key prefix. Returns (Provider, is_exact_match).
+    pub fn detect_from_key(key: &str) -> (Self, bool) {
         if key.starts_with("gsk_") {
-            Self::Groq
+            (Self::Groq, true)
         } else if key.starts_with("AIza") {
-            Self::Gemini
+            (Self::Gemini, true)
+        } else if key.starts_with("sk-") && !key.starts_with("sk-ant-") {
+            (Self::OpenAi, true)
         } else {
-            Self::OpenAi
+            (Self::OpenAi, false)
         }
     }
 
@@ -66,6 +68,15 @@ impl Provider {
             Self::Groq => "llama-3.3-70b-versatile",
             Self::Gemini => "gemini-2.0-flash",
             Self::OpenAi => "gpt-4o-mini",
+        }
+    }
+
+    /// Stable lowercase key used as a cache map entry for this provider.
+    pub fn cache_key(&self) -> &'static str {
+        match self {
+            Self::Groq => "groq",
+            Self::Gemini => "gemini",
+            Self::OpenAi => "openai",
         }
     }
 
@@ -100,14 +111,15 @@ mod tests {
 
     #[test]
     fn test_detect_from_key() {
-        assert_eq!(Provider::detect_from_key("gsk_abc123"), Provider::Groq);
+        assert_eq!(Provider::detect_from_key("gsk_abc123").0, Provider::Groq);
         assert_eq!(
-            Provider::detect_from_key("AIzaSyB_something"),
+            Provider::detect_from_key("AIzaSyB_something").0,
             Provider::Gemini
         );
-        assert_eq!(Provider::detect_from_key("sk-proj-abc"), Provider::OpenAi);
+        assert_eq!(Provider::detect_from_key("sk-proj-abc").0, Provider::OpenAi);
         // Unknown prefix falls back to OpenAI
-        assert_eq!(Provider::detect_from_key("random_key"), Provider::OpenAi);
+        assert_eq!(Provider::detect_from_key("random_key").0, Provider::OpenAi);
+        assert_eq!(Provider::detect_from_key("random_key").1, false);
     }
 
     #[test]

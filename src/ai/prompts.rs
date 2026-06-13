@@ -1,7 +1,5 @@
 use crate::git::RepoState;
 
-/// Maximum number of bytes to include from a diff in the AI prompt.
-pub const MAX_PROMPT_DIFF_BYTES: usize = 10_000;
 
 pub const SYSTEM_PROMPT: &str = "\
 You are an AI assistant helping a developer instantly get back into their flow. \
@@ -25,12 +23,12 @@ pub fn build_user_prompt(state: &RepoState) -> String {
     );
 
     if !state.diff_cached.is_empty() {
-        let diff = truncate_lines(&state.diff_cached, MAX_PROMPT_DIFF_BYTES);
+        let diff = truncate_lines(&state.diff_cached, crate::git::MAX_GIT_DIFF_BYTES);
         user_prompt.push_str(&format!("- Staged Changes:\n{}\n", diff));
     }
 
     if !state.diff.is_empty() {
-        let diff = truncate_lines(&state.diff, MAX_PROMPT_DIFF_BYTES);
+        let diff = truncate_lines(&state.diff, crate::git::MAX_GIT_DIFF_BYTES);
         user_prompt.push_str(&format!("- Unstaged Changes:\n{}\n", diff));
     }
     user_prompt

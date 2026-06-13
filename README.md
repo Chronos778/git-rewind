@@ -24,7 +24,7 @@ You work on a feature, switch to a bugfix, leave for the weekend, and come back 
 ## Installation
 
 ### Option 1: Automatic Install Scripts (Recommended)
-You do not need Rust or developer tools installed. These scripts will download the latest binary, place it in an appropriate folder (`~/.local/bin` for Unix, `%USERPROFILE%\.rewindin` for Windows), and automatically add it to your system's PATH.
+You do not need Rust or developer tools installed. These scripts will download the latest binary, place it in an appropriate folder (`~/.local/bin` for Unix, `%USERPROFILE%\.rewind\bin` for Windows), and automatically add it to your system's PATH.
 
 **Windows (PowerShell):**
 ```powershell
@@ -35,6 +35,12 @@ powershell -ExecutionPolicy Bypass -File "$env:TEMP\rewind_install.ps1"
 
 **Linux / macOS (Bash):**
 ```bash
+# Recommended: Download, inspect, and run
+curl -fsSL https://raw.githubusercontent.com/Chronos778/git-rewind/main/install.sh -o install.sh
+chmod +x install.sh
+./install.sh
+
+# Quick install:
 curl -fsSL https://raw.githubusercontent.com/Chronos778/git-rewind/main/install.sh | bash
 ```
 

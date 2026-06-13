@@ -3,7 +3,7 @@ use std::fs;
 use std::process::Command;
 
 /// Maximum number of bytes to read from a git diff output.
-const MAX_GIT_DIFF_BYTES: usize = 15_000;
+pub const MAX_GIT_DIFF_BYTES: usize = 15_000;
 
 pub struct RepoState {
     pub branch: String,
@@ -11,6 +11,8 @@ pub struct RepoState {
     pub log: String,
     pub diff: String,
     pub diff_cached: String,
+    /// Absolute path to the repository root (from `git rev-parse --show-toplevel`).
+    pub root: String,
 }
 
 /// RAII guard that ensures a child process is killed and waited on when dropped,
@@ -114,6 +116,7 @@ pub fn get_repo_state() -> Result<RepoState> {
         log,
         diff,
         diff_cached,
+        root: repo_root,
     })
 }
 
