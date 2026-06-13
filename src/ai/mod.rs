@@ -14,7 +14,9 @@ pub async fn analyze_repo(
     json_format: bool,
 ) -> Result<(String, Option<(u32, u32)>)> {
     let cfg = crate::config::load_config();
-    let mut actual_system_prompt = cfg.system_prompt.unwrap_or_else(|| prompts::SYSTEM_PROMPT.to_string());
+    let mut actual_system_prompt = cfg
+        .system_prompt
+        .unwrap_or_else(|| prompts::SYSTEM_PROMPT.to_string());
     if short {
         actual_system_prompt.push_str(
             "\n\nConstraint: Your response MUST be extremely short. 2 sentences maximum.",
@@ -38,7 +40,9 @@ pub async fn analyze_repo_streaming(
 ) -> Result<(String, Option<(u32, u32)>)> {
     let user_prompt = prompts::build_user_prompt(state);
     let cfg = crate::config::load_config();
-    let system_prompt = cfg.system_prompt.unwrap_or_else(|| prompts::SYSTEM_PROMPT.to_string());
+    let system_prompt = cfg
+        .system_prompt
+        .unwrap_or_else(|| prompts::SYSTEM_PROMPT.to_string());
     client::api_call_streaming(&system_prompt, &user_prompt, on_first_token).await
 }
 

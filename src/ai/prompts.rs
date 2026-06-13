@@ -1,6 +1,5 @@
 use crate::git::RepoState;
 
-
 pub const SYSTEM_PROMPT: &str = "\
 You are an AI assistant helping a developer instantly get back into their flow. \
 The developer has just opened their terminal and run the `rewind` command. \
@@ -99,6 +98,7 @@ mod tests {
     #[test]
     fn test_build_user_prompt_basic() {
         let state = RepoState {
+            root: "/mock/root".to_string(),
             branch: "main".to_string(),
             status: "## main".to_string(),
             log: "abc1234 initial commit".to_string(),
@@ -115,6 +115,7 @@ mod tests {
     #[test]
     fn test_build_user_prompt_with_diffs() {
         let state = RepoState {
+            root: "/mock/root".to_string(),
             branch: "feature".to_string(),
             status: "M src/lib.rs".to_string(),
             log: "def5678 add feature".to_string(),

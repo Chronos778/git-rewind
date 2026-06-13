@@ -58,7 +58,9 @@ jobs:
           key: ${{ runner.os }}-cargo-msrv-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Check compilation on MSRV
-        run: cargo check
+        run: |
+          rm Cargo.lock
+          cargo check
 
   test:
     name: Test (${{ matrix.os }})
