@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0](https://github.com/Chronos778/git-rewind/compare/v1.2.2...v1.3.0) - 2026-06-13
+
+### Added
+
+- add CI workflow, AI prompt logic, and user configuration management
+- implement persistent configuration management and model caching for AI providers
+- implement core AI modules, configuration management, and robust release downloading for git-rewind
+- implement multi-provider LLM infrastructure with automatic key detection and release workflows
+
+### Other
+
+- add GitHub Actions workflow and update self_update dependency
+- downgrade self_update to version 0.41.0 in Cargo.toml
+- add GitHub Actions workflow and update MSRV to 1.78
+
 ## [1.2.2](https://github.com/Chronos778/git-rewind/compare/v1.2.1...v1.2.2) - 2026-06-10
 
 ### Fixed
