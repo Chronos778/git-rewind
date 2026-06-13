@@ -74,8 +74,23 @@ rewind config set openai sk-proj-...
 rewind config model groq llama-3.3-70b-versatile
 rewind config model openai gpt-4o
 
+# Customize the AI's personality or focus
+rewind config system-prompt "You are a harsh code reviewer. Be critical."
+# Clear the custom prompt
+rewind config system-prompt
+
 # Delete a key and model settings
 rewind config clear openai
+```
+
+### Local Configuration (`.rewindrc`)
+You can override your global settings on a per-project basis. Just create a `.rewindrc` file (JSON format) in your repository root. This is particularly useful if you want to use a specific model or a custom system prompt for a particular codebase.
+
+```json
+{
+  "system_prompt": "You are a senior Rust developer. Focus on performance and safety.",
+  "openai_model": "gpt-4-turbo"
+}
 ```
 
 Alternatively, `rewind` checks your environment variables for keys to several top providers:
