@@ -1,4 +1,4 @@
-name: Check, Lint & Test
+name: CI
 
 on:
   push:
@@ -14,7 +14,7 @@ env:
 
 jobs:
   lint:
-    name: Lint
+    name: Check, Lint & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
