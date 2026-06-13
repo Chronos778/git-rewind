@@ -99,14 +99,12 @@ pub fn get_repo_state() -> Result<RepoState> {
     let mut log = String::new();
     if let Ok(mut revwalk) = repo.revwalk() {
         if revwalk.push_head().is_ok() {
-            for oid in revwalk.take(5) {
-                if let Ok(oid) = oid {
-                    if let Ok(commit) = repo.find_commit(oid) {
-                        let id = &commit.id().to_string()[..7];
-                        let summary_bytes = commit.summary_bytes().unwrap_or(b"");
-                        let summary = String::from_utf8_lossy(summary_bytes);
-                        log.push_str(&format!("{} {}\n", id, summary));
-                    }
+            for oid in revwalk.take(5).flatten() {
+                if let Ok(commit) = repo.find_commit(oid) {
+                    let id = &commit.id().to_string()[..7];
+                    let summary_bytes = commit.summary_bytes().unwrap_or(b"");
+                    let summary = String::from_utf8_lossy(summary_bytes);
+                    log.push_str(&format!("{} {}\n", id, summary));
                 }
             }
         }
