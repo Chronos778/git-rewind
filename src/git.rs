@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
+use git2::{DiffFormat, DiffOptions, Repository, StatusOptions};
 use std::fs;
-use std::process::Command;
+use std::path::{Path, PathBuf};
 
 /// Maximum number of bytes to read from a git diff output.
 pub const MAX_GIT_DIFF_BYTES: usize = 15_000;
@@ -11,22 +12,11 @@ pub struct RepoState {
     pub log: String,
     pub diff: String,
     pub diff_cached: String,
-    /// Absolute path to the repository root (from `git rev-parse --show-toplevel`).
+    /// Absolute path to the repository root
     pub root: String,
 }
 
-/// RAII guard that ensures a child process is killed and waited on when dropped,
-/// preventing zombie processes even if an error or panic occurs during reading.
-struct ChildGuard(std::process::Child);
-
-impl Drop for ChildGuard {
-    fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
-    }
-}
-
-fn get_exclusions(repo_root: &str) -> Vec<String> {
+fn get_exclusions(repo_root: &Path) -> Vec<String> {
     let mut exclusions = Vec::new();
 
     let default_excludes = [
@@ -55,16 +45,16 @@ fn get_exclusions(repo_root: &str) -> Vec<String> {
         "*.min.css",
     ];
     for ext in default_excludes {
-        exclusions.push(format!(":(exclude){}", ext));
+        exclusions.push(format!(":!{}", ext));
     }
 
     // Helper closure to read ignore files
-    let mut add_ignores = |path: std::path::PathBuf| {
+    let mut add_ignores = |path: PathBuf| {
         if let Ok(content) = fs::read_to_string(path) {
             for line in content.lines() {
                 let trimmed = line.trim();
                 if !trimmed.is_empty() && !trimmed.starts_with('#') {
-                    exclusions.push(format!(":(exclude){}", trimmed));
+                    exclusions.push(format!(":!{}", trimmed));
                 }
             }
         }
@@ -76,94 +66,149 @@ fn get_exclusions(repo_root: &str) -> Vec<String> {
     }
 
     // 2. Repository exclusions (relative to the repo root)
-    add_ignores(std::path::Path::new(repo_root).join(".rewindignore"));
+    add_ignores(repo_root.join(".rewindignore"));
 
     exclusions
 }
 
 pub fn get_repo_state() -> Result<RepoState> {
-    // Check if git is installed
-    if Command::new("git").arg("--version").output().is_err() {
-        anyhow::bail!("Git is not installed or not available on the PATH.");
-    }
+    let repo = Repository::discover(".")
+        .context("Not a git repository (or any of the parent directories).")?;
+    let repo_root_path = repo
+        .workdir()
+        .context("Bare repositories are not supported.")?;
+    // canonicalize path for cross-platform robustness
+    let repo_root_path =
+        dunce::canonicalize(repo_root_path).unwrap_or_else(|_| repo_root_path.to_path_buf());
+    let root_str = repo_root_path.to_string_lossy().to_string();
 
-    // Check if we are in a git repo
-    let check = Command::new("git")
-        .args(["rev-parse", "--is-inside-work-tree"])
-        .output()?;
-    if !check.status.success() {
-        anyhow::bail!("Not a git repository (or any of the parent directories).");
-    }
+    let exclusions = get_exclusions(&repo_root_path);
 
-    let repo_root = run_git(&["rev-parse", "--show-toplevel"])?;
-    let exclusions = get_exclusions(&repo_root);
-    let mut diff_args_uncached = vec!["diff", "--stat", "-p", "--", "."];
-    let mut diff_args_cached = vec!["diff", "--cached", "--stat", "-p", "--", "."];
+    // 1. Branch
+    let branch = if let Ok(head) = repo.head() {
+        if head.is_branch() {
+            head.shorthand().unwrap_or("").to_string()
+        } else {
+            "HEAD (detached)".to_string()
+        }
+    } else {
+        "No commits yet".to_string()
+    };
 
-    let exclusion_refs: Vec<&str> = exclusions.iter().map(|s| s.as_str()).collect();
-    diff_args_uncached.extend(&exclusion_refs);
-    diff_args_cached.extend(&exclusion_refs);
-
-    let branch = run_git(&["branch", "--show-current"])?;
-    let status = run_git(&["status", "--short", "--branch"])?;
-    let log = run_git(&["log", "-n", "5", "--oneline"])?;
-    let diff = run_git_limited(&diff_args_uncached, MAX_GIT_DIFF_BYTES)?;
-    let diff_cached = run_git_limited(&diff_args_cached, MAX_GIT_DIFF_BYTES)?;
-
-    Ok(RepoState {
-        branch,
-        status,
-        log,
-        diff,
-        diff_cached,
-        root: repo_root,
-    })
-}
-
-fn run_git(args: &[&str]) -> Result<String> {
-    let output = Command::new("git")
-        .args(args)
-        .output()
-        .context(format!("Failed to run `git {:?}`", args))?;
-
-    // In new repos, git log returns exit code 128 ("no commits yet"), which we treat as empty output.
-    // For other commands, a non-zero exit is unexpected and worth warning about.
-    if !output.status.success() && args[0] != "log" {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if !stderr.trim().is_empty() {
-            eprintln!(
-                "[WARN] `git {}` exited with {}: {}",
-                args.join(" "),
-                output.status,
-                stderr.trim()
-            );
+    // 2. Log
+    let mut log = String::new();
+    if let Ok(mut revwalk) = repo.revwalk() {
+        if revwalk.push_head().is_ok() {
+            for oid in revwalk.take(5) {
+                if let Ok(oid) = oid {
+                    if let Ok(commit) = repo.find_commit(oid) {
+                        let id = &commit.id().to_string()[..7];
+                        let summary = commit.summary().unwrap_or("");
+                        log.push_str(&format!("{} {}\n", id, summary));
+                    }
+                }
+            }
         }
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    Ok(stdout.trim().to_string())
-}
+    // 3. Status
+    let mut status_str = String::new();
+    let mut status_opts = StatusOptions::new();
+    status_opts
+        .include_untracked(true)
+        .recurse_untracked_dirs(true);
+    if let Ok(statuses) = repo.statuses(Some(&mut status_opts)) {
+        for entry in statuses.iter() {
+            let path = entry.path().unwrap_or("");
+            let s = entry.status();
 
-fn run_git_limited(args: &[&str], limit: usize) -> Result<String> {
-    use std::io::Read;
-    use std::process::Stdio;
+            let mut x = ' ';
+            let mut y = ' ';
 
-    let child = Command::new("git")
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .context(format!("Failed to run `git {:?}`", args))?;
+            if s.contains(git2::Status::INDEX_NEW) {
+                x = 'A';
+            } else if s.contains(git2::Status::INDEX_MODIFIED) {
+                x = 'M';
+            } else if s.contains(git2::Status::INDEX_DELETED) {
+                x = 'D';
+            } else if s.contains(git2::Status::INDEX_RENAMED) {
+                x = 'R';
+            } else if s.contains(git2::Status::INDEX_TYPECHANGE) {
+                x = 'T';
+            }
 
-    // ChildGuard ensures kill+wait even if read_to_end panics or errors out
-    let mut guard = ChildGuard(child);
+            if s.contains(git2::Status::WT_NEW) {
+                y = '?';
+                x = '?';
+            } else if s.contains(git2::Status::WT_MODIFIED) {
+                y = 'M';
+            } else if s.contains(git2::Status::WT_DELETED) {
+                y = 'D';
+            } else if s.contains(git2::Status::WT_RENAMED) {
+                y = 'R';
+            } else if s.contains(git2::Status::WT_TYPECHANGE) {
+                y = 'T';
+            }
 
-    let stdout = guard.0.stdout.take().expect("Failed to open stdout");
-    let mut buffer = Vec::new();
-    stdout.take(limit as u64).read_to_end(&mut buffer)?;
+            status_str.push_str(&format!("{}{} {}\n", x, y, path));
+        }
+    }
 
-    // Drop guard handles cleanup automatically
+    // 4. Diffs
+    let mut diff_opts = DiffOptions::new();
+    for exc in &exclusions {
+        diff_opts.pathspec(exc);
+    }
+    // We add "*" so it defaults to including everything else.
+    // In libgit2 pathspecs, `:!` is the standard for exclusions.
+    diff_opts.pathspec("*");
 
-    let text = String::from_utf8_lossy(&buffer).to_string();
-    Ok(text.trim().to_string())
+    let head_tree = repo.head().and_then(|h| h.peel_to_tree()).ok();
+
+    // Diff Cached (Index vs HEAD)
+    let diff_cached = match &head_tree {
+        Some(tree) => repo.diff_tree_to_index(Some(tree), None, Some(&mut diff_opts)),
+        None => repo.diff_tree_to_index(None, None, Some(&mut diff_opts)), // Empty tree if no commits
+    }
+    .context("Failed to generate cached diff")?;
+
+    // Diff Uncached (Workspace vs Index)
+    let diff_uncached = repo
+        .diff_index_to_workdir(None, Some(&mut diff_opts))
+        .context("Failed to generate workspace diff")?;
+
+    let mut diff_cached_str = String::new();
+    let _ = diff_cached.print(DiffFormat::Patch, |_delta, _hunk, line| {
+        if diff_cached_str.len() < MAX_GIT_DIFF_BYTES {
+            let prefix = match line.origin() {
+                '+' | '-' | ' ' => line.origin().to_string(),
+                _ => String::new(),
+            };
+            diff_cached_str.push_str(&prefix);
+            diff_cached_str.push_str(&String::from_utf8_lossy(line.content()));
+        }
+        true
+    });
+
+    let mut diff_uncached_str = String::new();
+    let _ = diff_uncached.print(DiffFormat::Patch, |_delta, _hunk, line| {
+        if diff_uncached_str.len() < MAX_GIT_DIFF_BYTES {
+            let prefix = match line.origin() {
+                '+' | '-' | ' ' => line.origin().to_string(),
+                _ => String::new(),
+            };
+            diff_uncached_str.push_str(&prefix);
+            diff_uncached_str.push_str(&String::from_utf8_lossy(line.content()));
+        }
+        true
+    });
+
+    Ok(RepoState {
+        branch: branch.trim().to_string(),
+        status: status_str.trim().to_string(),
+        log: log.trim().to_string(),
+        diff: diff_uncached_str.trim().to_string(),
+        diff_cached: diff_cached_str.trim().to_string(),
+        root: root_str,
+    })
 }

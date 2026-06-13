@@ -3,6 +3,7 @@ use crate::ConfigCommands;
 use anyhow::{Context, Result};
 use colored::*;
 use directories::ProjectDirs;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
@@ -23,9 +24,9 @@ pub struct CachedModel {
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct Config {
-    pub groq_api_key: Option<String>,
-    pub gemini_api_key: Option<String>,
-    pub openai_api_key: Option<String>,
+    pub groq_api_key: Option<SecretString>,
+    pub gemini_api_key: Option<SecretString>,
+    pub openai_api_key: Option<SecretString>,
     pub groq_model: Option<String>,
     pub gemini_model: Option<String>,
     pub openai_model: Option<String>,
@@ -39,7 +40,7 @@ pub struct Config {
 
 impl Config {
     /// Get the API key for a provider.
-    pub fn get_api_key(&self, provider: Provider) -> Option<&String> {
+    pub fn get_api_key(&self, provider: Provider) -> Option<&SecretString> {
         match provider {
             Provider::Groq => self.groq_api_key.as_ref(),
             Provider::Gemini => self.gemini_api_key.as_ref(),
@@ -49,10 +50,11 @@ impl Config {
 
     /// Set (or clear) the API key for a provider.
     pub fn set_api_key(&mut self, provider: Provider, key: Option<String>) {
+        let secret = key.map(SecretString::from);
         match provider {
-            Provider::Groq => self.groq_api_key = key,
-            Provider::Gemini => self.gemini_api_key = key,
-            Provider::OpenAi => self.openai_api_key = key,
+            Provider::Groq => self.groq_api_key = secret,
+            Provider::Gemini => self.gemini_api_key = secret,
+            Provider::OpenAi => self.openai_api_key = secret,
         }
     }
 
@@ -175,7 +177,8 @@ pub fn save_config(config: &Config) -> Result<()> {
     Ok(())
 }
 
-fn mask_key(k: &str) -> String {
+fn mask_key(secret: &SecretString) -> String {
+    let k = secret.expose_secret();
     if k.len() <= 8 {
         return "********".to_string();
     }
@@ -346,19 +349,22 @@ mod tests {
 
     #[test]
     fn test_mask_key_long() {
-        let masked = mask_key("gsk_abcdefghijklmnop");
+        let masked = mask_key(&SecretString::from("gsk_abcdefghijklmnop".to_string()));
         assert_eq!(masked, "gsk_...mnop");
     }
 
     #[test]
     fn test_mask_key_short() {
-        assert_eq!(mask_key("abc"), "********");
-        assert_eq!(mask_key("12345678"), "********");
+        assert_eq!(mask_key(&SecretString::from("abc".to_string())), "********");
+        assert_eq!(
+            mask_key(&SecretString::from("12345678".to_string())),
+            "********"
+        );
     }
 
     #[test]
     fn test_mask_key_exactly_nine() {
-        let masked = mask_key("123456789");
+        let masked = mask_key(&SecretString::from("123456789".to_string()));
         assert_eq!(masked, "1234...6789");
     }
 
@@ -368,7 +374,10 @@ mod tests {
         assert!(config.get_api_key(Provider::Groq).is_none());
 
         config.set_api_key(Provider::Groq, Some("test_key".to_string()));
-        assert_eq!(config.get_api_key(Provider::Groq).unwrap(), "test_key");
+        assert_eq!(
+            config.get_api_key(Provider::Groq).unwrap().expose_secret(),
+            "test_key"
+        );
 
         config.set_api_key(Provider::Groq, None);
         assert!(config.get_api_key(Provider::Groq).is_none());
