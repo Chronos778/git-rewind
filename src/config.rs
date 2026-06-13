@@ -105,6 +105,17 @@ impl Config {
             },
         );
     }
+
+    /// Merge another Config (e.g. from .rewindrc) into this one, overwriting current values.
+    pub fn merge(&mut self, other: Config) {
+        if other.groq_api_key.is_some() { self.groq_api_key = other.groq_api_key; }
+        if other.gemini_api_key.is_some() { self.gemini_api_key = other.gemini_api_key; }
+        if other.openai_api_key.is_some() { self.openai_api_key = other.openai_api_key; }
+        if other.groq_model.is_some() { self.groq_model = other.groq_model; }
+        if other.gemini_model.is_some() { self.gemini_model = other.gemini_model; }
+        if other.openai_model.is_some() { self.openai_model = other.openai_model; }
+        if other.system_prompt.is_some() { self.system_prompt = other.system_prompt; }
+    }
 }
 
 fn get_config_path() -> Option<std::path::PathBuf> {
@@ -113,14 +124,30 @@ fn get_config_path() -> Option<std::path::PathBuf> {
 }
 
 pub fn load_config() -> Config {
+    let mut base_config = Config::default();
+
+    // 1. Load global config
     if let Some(path) = get_config_path() {
         if let Ok(contents) = fs::read_to_string(path) {
             if let Ok(config) = serde_json::from_str(&contents) {
-                return config;
+                base_config = config;
             }
         }
     }
-    Config::default()
+
+    // 2. Load and merge local .rewindrc
+    if let Ok(cwd) = env::current_dir() {
+        let local_rc = cwd.join(".rewindrc");
+        if local_rc.exists() {
+            if let Ok(contents) = fs::read_to_string(local_rc) {
+                if let Ok(local_config) = serde_json::from_str::<Config>(&contents) {
+                    base_config.merge(local_config);
+                }
+            }
+        }
+    }
+
+    base_config
 }
 
 pub fn save_config(config: &Config) -> Result<()> {
