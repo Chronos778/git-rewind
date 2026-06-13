@@ -85,6 +85,11 @@ pub enum ConfigCommands {
         /// The provider to clear the key for (groq, gemini, openai)
         provider: String,
     },
+    /// Set a custom system prompt (omit to clear)
+    SystemPrompt {
+        /// The custom system prompt to use
+        prompt: Option<String>,
+    },
     /// Show configured API keys (redacted) and custom models
     Show,
 }

@@ -23,8 +23,11 @@ case "$OS" in
     *) echo "Unsupported OS: $OS"; exit 1 ;;
 esac
 
-# Poor man's JSON parsing (assuming standard github API format)
-URL=$(echo "$RELEASE" | grep -o "browser_download_url\": \"[^\"]*" | grep "$OS" | grep "$ARCH" | grep "\.tar\.gz$" | cut -d'"' -f3 | head -n 1)
+if command -v jq >/dev/null 2>&1; then
+    URL=$(echo "$RELEASE" | jq -r ".assets[] | select(.name | contains(\"$OS\") and contains(\"$ARCH\") and endswith(\".tar.gz\")) | .browser_download_url" | head -n 1)
+else
+    URL=$(echo "$RELEASE" | python3 -c "import sys, json; print(next((a['browser_download_url'] for a in json.load(sys.stdin).get('assets', []) if '$OS' in a['name'] and '$ARCH' in a['name'] and a['name'].endswith('.tar.gz')), ''))" 2>/dev/null)
+fi
 
 if [ -z "$URL" ]; then
     echo "Failed to find a suitable download for $OS-$ARCH."

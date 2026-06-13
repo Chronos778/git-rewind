@@ -32,6 +32,9 @@ pub struct Config {
     /// Per-provider model cache so `GET /models` is not called on every invocation.
     #[serde(default)]
     pub model_cache: HashMap<String, CachedModel>,
+    /// Optional custom system prompt
+    #[serde(default)]
+    pub system_prompt: Option<String>,
 }
 
 impl Config {
@@ -202,6 +205,17 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
                 p.display_name()
             );
         }
+        ConfigCommands::SystemPrompt { prompt } => {
+            if let Some(p) = prompt {
+                config.system_prompt = Some(p.clone());
+                save_config(&config)?;
+                println!("{} Custom system prompt has been set.", "[SUCCESS]".green());
+            } else {
+                config.system_prompt = None;
+                save_config(&config)?;
+                println!("{} Custom system prompt has been cleared.", "[SUCCESS]".green());
+            }
+        }
         ConfigCommands::Show => {
             println!("{} \n", "[ CONFIGURED API KEYS & MODELS ]".bold());
             for &p in Provider::all() {
@@ -219,6 +233,9 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
                 } else {
                     println!("{}: Not set", p.display_name().bright_black());
                 }
+            }
+            if let Some(prompt) = &config.system_prompt {
+                println!("\n{}: {}", "Custom System Prompt".cyan(), prompt);
             }
         }
     }

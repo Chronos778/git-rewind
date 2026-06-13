@@ -13,7 +13,8 @@ pub async fn analyze_repo(
     short: bool,
     json_format: bool,
 ) -> Result<(String, Option<(u32, u32)>)> {
-    let mut actual_system_prompt = prompts::SYSTEM_PROMPT.to_string();
+    let cfg = crate::config::load_config();
+    let mut actual_system_prompt = cfg.system_prompt.unwrap_or_else(|| prompts::SYSTEM_PROMPT.to_string());
     if short {
         actual_system_prompt.push_str(
             "\n\nConstraint: Your response MUST be extremely short. 2 sentences maximum.",
@@ -36,7 +37,9 @@ pub async fn analyze_repo_streaming(
     on_first_token: impl FnOnce(),
 ) -> Result<(String, Option<(u32, u32)>)> {
     let user_prompt = prompts::build_user_prompt(state);
-    client::api_call_streaming(prompts::SYSTEM_PROMPT, &user_prompt, on_first_token).await
+    let cfg = crate::config::load_config();
+    let system_prompt = cfg.system_prompt.unwrap_or_else(|| prompts::SYSTEM_PROMPT.to_string());
+    client::api_call_streaming(&system_prompt, &user_prompt, on_first_token).await
 }
 
 /// Ask a specific question about the repository state, returning a streaming response and token usage telemetry.
@@ -45,13 +48,14 @@ pub async fn ask_question_streaming(
     query: &str,
     on_first_token: impl FnOnce(),
 ) -> Result<(String, Option<(u32, u32)>)> {
-    let system_prompt = "You are an expert AI pair programmer embedded in the user's terminal. Answer the user's question accurately based on their current repository state and diffs.";
+    let cfg = crate::config::load_config();
+    let system_prompt = cfg.system_prompt.unwrap_or_else(|| "You are an expert AI pair programmer embedded in the user's terminal. Answer the user's question accurately based on their current repository state and diffs.".to_string());
     let user_prompt = format!(
         "{}\n\nUser Question:\n{}",
         prompts::build_user_prompt(state),
         query
     );
-    client::api_call_streaming(system_prompt, &user_prompt, on_first_token).await
+    client::api_call_streaming(&system_prompt, &user_prompt, on_first_token).await
 }
 
 /// Generate a concise commit message based on the current repository diff along with token usage telemetry.
