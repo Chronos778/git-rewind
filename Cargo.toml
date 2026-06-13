@@ -1,6 +1,6 @@
 [package]
 name = "git-rewind"
-version = "1.4.0"
+version = "1.5.0"
 edition = "2021"
 authors = ["Chronos778"]
 description = "An AI-powered CLI tool that analyzes a git repository and instantly tells you where you left off."

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0](https://github.com/Chronos778/git-rewind/compare/v1.4.0...v1.5.0) - 2026-06-13
+
+### Added
+
+- implement CLI command structure and AI repository analysis logic in main.rs
+
 ## [1.4.0](https://github.com/Chronos778/git-rewind/compare/v1.3.1...v1.4.0) - 2026-06-13
 
 ### Added
