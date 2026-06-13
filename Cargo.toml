@@ -24,7 +24,7 @@ colored = "3.1.1"
 directories = "6.0.0"
 indicatif = "0.18.4"
 reqwest = { version = "0.13.3", features = ["json"] }
-self_update = { version = "0.44.0", features = ["compression-flate2", "compression-zip-deflate"] }
+self_update = { version = "0.41.0", features = ["compression-flate2", "compression-zip-deflate"] }
 serde = { version = "1.0.228", features = ["derive"] }
 rpassword = "7.3.1"
 serde_json = "1.0.149"
