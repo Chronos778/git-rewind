@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0](https://github.com/Chronos778/git-rewind/compare/v1.3.1...v1.4.0) - 2026-06-13
+
+### Added
+
+- implement repository state extraction with pathspec-based diff filtering and ignore support
+- implement AI client with support for streaming, retries, and dynamic model discovery
+- implement persistent configuration management with support for API keys, custom models, and local overrides
+- implement AI client for LLM interaction with streaming, retries, and configuration management
+
+### Other
+
+- enable reqwest feature for self_update dependency
+- enable blocking feature for reqwest dependency
+- Merge branch 'main' of https://github.com/Chronos778/git-rewind
+
 ## [1.3.1](https://github.com/Chronos778/git-rewind/compare/v1.3.0...v1.3.1) - 2026-06-13
 
 ### Other
