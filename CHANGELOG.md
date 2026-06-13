@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1](https://github.com/Chronos778/git-rewind/compare/v1.3.0...v1.3.1) - 2026-06-13
+
+### Other
+
+- update reqwest to use rustls-tls and disable default features
+- document system-prompt configuration and per-project .rewindrc support
+
 ## [1.3.0](https://github.com/Chronos778/git-rewind/compare/v1.2.2...v1.3.0) - 2026-06-13
 
 ### Added
