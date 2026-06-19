@@ -385,7 +385,9 @@ pub fn ensure_configured() -> Result<()> {
     }
     config.set_api_key(provider, Some(key));
 
-    save_config(&config).context("Failed to save configuration after first-time setup")?;
+    let mut global_config = load_global_config();
+    global_config.set_api_key(provider, Some(key.clone()));
+    save_config(&global_config).context("Failed to save configuration after first-time setup")?;
     Ok(())
 }
 

@@ -76,6 +76,27 @@ pub async fn ask_question_streaming(
     client::api_call_streaming(&system_prompt, &user_prompt, on_first_token).await
 }
 
+/// Ask a specific question about the repository state, returning a non-streaming response.
+pub async fn ask_question(
+    state: &RepoState,
+    query: &str,
+) -> Result<(String, Option<(u32, u32)>)> {
+    let cfg = crate::config::load_config();
+    let mut system_prompt = "You are an expert AI pair programmer embedded in the user's terminal. Answer the user's question accurately based on their current repository state and diffs.".to_string();
+    
+    if let Some(custom) = cfg.system_prompt {
+        system_prompt.push_str("\n\nUser's Custom Instructions:\n");
+        system_prompt.push_str(&custom);
+    }
+
+    let user_prompt = format!(
+        "{}\n\nUser Question:\n{}",
+        prompts::build_user_prompt(state),
+        query
+    );
+    client::api_call(&system_prompt, &user_prompt).await
+}
+
 /// Generate a concise commit message based on the current repository diff along with token usage telemetry.
 pub async fn generate_commit_message(state: &RepoState) -> Result<(String, Option<(u32, u32)>)> {
     let cfg = crate::config::load_config();

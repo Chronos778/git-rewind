@@ -132,25 +132,35 @@ async fn main() -> Result<()> {
             let chars = prompt.len();
             let words = prompt.split_whitespace().count();
             let approx_tokens = (chars / 4 + (words * 13 / 10)) / 2;
-            println!(
-                "{} Approximate Tokens: ~{}",
-                "[ESTIMATE]".green().bold(),
-                approx_tokens
-            );
-            println!(
-                "{} Characters: {} | Words: {}",
-                "[ESTIMATE]".green().bold(),
-                chars,
-                words
-            );
-            println!(
-                "{} This is a rough estimate. Actual context window and token usage vary by model.",
-                "[NOTE]".bright_black()
-            );
-            println!(
-                "{} To test specific tokenizers, try: https://tiktokenizer.vercel.app",
-                "[TIP]".bright_black()
-            );
+            
+            if args.json {
+                let json_output = serde_json::json!({
+                    "approx_tokens": approx_tokens,
+                    "characters": chars,
+                    "words": words
+                });
+                println!("{}", json_output);
+            } else {
+                println!(
+                    "{} Approximate Tokens: ~{}",
+                    "[ESTIMATE]".green().bold(),
+                    approx_tokens
+                );
+                println!(
+                    "{} Characters: {} | Words: {}",
+                    "[ESTIMATE]".green().bold(),
+                    chars,
+                    words
+                );
+                println!(
+                    "{} This is a rough estimate. Actual context window and token usage vary by model.",
+                    "[NOTE]".bright_black()
+                );
+                println!(
+                    "{} To test specific tokenizers, try: https://tiktokenizer.vercel.app",
+                    "[TIP]".bright_black()
+                );
+            }
             return Ok(());
         }
         Some(Commands::History) => {
@@ -160,15 +170,25 @@ async fn main() -> Result<()> {
 
             if brief_path.exists() {
                 if let Ok(content) = std::fs::read_to_string(&brief_path) {
-                    println!("{}", content);
+                    if args.json {
+                        let json_output = serde_json::json!({ "brief": content.trim() });
+                        println!("{}", json_output);
+                    } else {
+                        println!("{}", content);
+                    }
                 } else {
                     anyhow::bail!("Failed to read {}", brief_filename);
                 }
             } else {
-                println!(
-                    "{} No previous brief found. Run `rewind` to generate one.",
-                    "[INFO]".cyan()
-                );
+                if args.json {
+                    let json_output = serde_json::json!({ "error": "No previous brief found." });
+                    println!("{}", json_output);
+                } else {
+                    println!(
+                        "{} No previous brief found. Run `rewind` to generate one.",
+                        "[INFO]".cyan()
+                    );
+                }
             }
             return Ok(());
         }
@@ -181,15 +201,27 @@ async fn main() -> Result<()> {
             let pb = make_spinner("Generating commit message...")?;
             let (msg, usage) = ai::generate_commit_message(&repo_state).await?;
             pb.finish_and_clear();
-            println!("\n{}\n", msg);
+            
+            if args.json {
+                let json_output = serde_json::json!({ "commit_message": msg.trim() });
+                println!("{}", json_output);
+            } else {
+                println!("\n{}\n", msg);
+            }
+            
             if let (true, Some((p, c))) = (args.verbose, usage) {
-                println!(
+                let telemetry = format!(
                     "{} Prompt: {} | Completion: {} | Total: {}",
                     "[TELEMETRY]".bright_black(),
                     p,
                     c,
                     p + c
                 );
+                if args.json {
+                    eprintln!("{}", telemetry);
+                } else {
+                    println!("{}", telemetry);
+                }
             }
             return Ok(());
         }
@@ -199,23 +231,42 @@ async fn main() -> Result<()> {
             if args.verbose {
                 print_diagnostics();
             }
-            let pb = make_spinner("Thinking...")?;
-            let (answer, usage) = ai::ask_question_streaming(&repo_state, &query, move || {
+            
+            let answer;
+            let usage;
+            if args.json {
+                let pb = make_spinner("Thinking...")?;
+                let (ans, useg) = ai::ask_question(&repo_state, &query).await?;
                 pb.finish_and_clear();
-                println!();
-            })
-            .await?;
-            println!("\n");
+                answer = ans;
+                usage = useg;
+                let json_output = serde_json::json!({ "answer": answer.trim() });
+                println!("{}", json_output);
+            } else {
+                let pb = make_spinner("Thinking...")?;
+                let (ans, useg) = ai::ask_question_streaming(&repo_state, &query, move || {
+                    pb.finish_and_clear();
+                    println!();
+                }).await?;
+                answer = ans;
+                usage = useg;
+                println!("\n");
+            }
+            
             if let (true, Some((p, c))) = (args.verbose, usage) {
-                println!(
+                let telemetry = format!(
                     "{} Prompt: {} | Completion: {} | Total: {}\n",
                     "[TELEMETRY]".bright_black(),
                     p,
                     c,
                     p + c
                 );
+                if args.json {
+                    eprintln!("{}", telemetry);
+                } else {
+                    println!("{}", telemetry);
+                }
             }
-            let _ = answer; // response already printed via streaming
             return Ok(());
         }
         None => {}
@@ -226,10 +277,15 @@ async fn main() -> Result<()> {
 
     if args.dry_run {
         let prompt = ai::build_user_prompt(&repo_state);
-        println!("{}", "[ DRY RUN: RAW LLM PROMPT ]".yellow().bold());
-        println!("{}", "─".repeat(60).bright_black());
-        println!("{}", prompt);
-        println!("{}", "─".repeat(60).bright_black());
+        if args.json {
+            let json_output = serde_json::json!({ "prompt": prompt });
+            println!("{}", json_output);
+        } else {
+            println!("{}", "[ DRY RUN: RAW LLM PROMPT ]".yellow().bold());
+            println!("{}", "─".repeat(60).bright_black());
+            println!("{}", prompt);
+            println!("{}", "─".repeat(60).bright_black());
+        }
         return Ok(());
     }
 
