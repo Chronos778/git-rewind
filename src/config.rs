@@ -285,13 +285,22 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
         ConfigCommands::Show => {
             println!("{} \n", "[ CONFIGURED API KEYS & MODELS ]".bold());
             for &p in Provider::all() {
-                if let Some(key) = config.get_api_key(p) {
-                    let model = match config.get_model(p) {
-                        Some(m) => m.clone(),
-                        None => format!("{} (default)", p.default_model()),
-                    };
+                let model = match config.get_model(p) {
+                    Some(m) => m.clone(),
+                    None => format!("{} (default)", p.default_model()),
+                };
+
+                if let Ok(env_key) = env::var(p.env_key_name()) {
+                    let secret = SecretString::from(env_key);
                     println!(
-                        "{}: {} [Model: {}]",
+                        "{}: {} (from env) [Model: {}]",
+                        p.display_name().green(),
+                        mask_key(&secret),
+                        model
+                    );
+                } else if let Some(key) = config.get_api_key(p) {
+                    println!(
+                        "{}: {} (from config) [Model: {}]",
                         p.display_name().green(),
                         mask_key(key),
                         model
