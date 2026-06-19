@@ -150,6 +150,10 @@ pub fn get_repo_state() -> Result<RepoState> {
             } else if s.contains(git2::Status::WT_TYPECHANGE) {
                 y = 'T';
             }
+            if s.contains(git2::Status::CONFLICTED) {
+                x = 'U';
+                y = 'U';
+            }
 
             status_str.push_str(&format!("{}{} {}\n", x, y, path));
         }
