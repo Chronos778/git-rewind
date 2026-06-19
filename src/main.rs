@@ -580,7 +580,8 @@ fn update_binary() -> Result<()> {
             )
         })?;
 
-    self_update::Move::from_source(&extracted_bin).replace_using_temp(&std::env::current_exe()?)?;
+    self_update::Move::from_source(&extracted_bin)
+        .to_dest(&std::env::current_exe()?)?;
 
     println!(
         "{} Updated successfully to version {}.",
