@@ -6,6 +6,9 @@ use std::path::{Path, PathBuf};
 /// Maximum number of bytes to read from a git diff output.
 pub const MAX_GIT_DIFF_BYTES: usize = 15_000;
 
+/// Maximum number of bytes to include in the status output.
+pub const MAX_GIT_STATUS_BYTES: usize = 10_000;
+
 pub struct RepoState {
     pub branch: String,
     pub status: String,
@@ -118,8 +121,14 @@ pub fn get_repo_state() -> Result<RepoState> {
     status_opts
         .include_untracked(true)
         .recurse_untracked_dirs(true);
+    let mut status_truncated = false;
     if let Ok(statuses) = repo.statuses(Some(&mut status_opts)) {
         for entry in statuses.iter() {
+            if status_str.len() > MAX_GIT_STATUS_BYTES {
+                status_truncated = true;
+                break;
+            }
+
             let path = entry.path().unwrap_or("");
             let s = entry.status();
 
@@ -157,6 +166,9 @@ pub fn get_repo_state() -> Result<RepoState> {
 
             status_str.push_str(&format!("{}{} {}\n", x, y, path));
         }
+    }
+    if status_truncated {
+        status_str.push_str("... [Status truncated due to length] ...\n");
     }
 
     // 4. Diffs
