@@ -258,14 +258,17 @@ async fn main() -> Result<()> {
         }
 
         if let (true, Some((p, c))) = (args.verbose, usage) {
-            if !args.json {
-                println!(
-                    "{} Prompt: {} | Completion: {} | Total: {}",
-                    "[TELEMETRY]".bright_black(),
-                    p,
-                    c,
-                    p + c
-                );
+            let msg = format!(
+                "{} Prompt: {} | Completion: {} | Total: {}",
+                "[TELEMETRY]".bright_black(),
+                p,
+                c,
+                p + c
+            );
+            if args.json {
+                eprintln!("{}", msg);
+            } else {
+                println!("{}", msg);
             }
         }
 
@@ -360,17 +363,23 @@ fn save_brief(summary: &str, repo_root: &str) {
 
             // Add to .gitignore at the repo root if not already present
             let gitignore_path = repo_path.join(".gitignore");
+            let mut should_append = true;
             if gitignore_path.exists() {
                 if let Ok(gitignore_content) = std::fs::read_to_string(&gitignore_path) {
-                    if !gitignore_content.contains(brief_filename) {
-                        use std::io::Write;
-                        if let Ok(mut file) = std::fs::OpenOptions::new()
-                            .append(true)
-                            .open(&gitignore_path)
-                        {
-                            let _ = writeln!(file, "\n# Rewind\n{}", brief_filename);
-                        }
+                    if gitignore_content.contains(brief_filename) {
+                        should_append = false;
                     }
+                }
+            }
+            
+            if should_append {
+                use std::io::Write;
+                if let Ok(mut file) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&gitignore_path)
+                {
+                    let _ = writeln!(file, "\n# Rewind\n{}", brief_filename);
                 }
             }
         }
