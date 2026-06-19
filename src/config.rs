@@ -393,7 +393,7 @@ pub fn ensure_configured() -> Result<()> {
             provider.display_name()
         );
     }
-    config.set_api_key(provider, Some(key));
+    config.set_api_key(provider, Some(key.clone()));
 
     let mut global_config = load_global_config()?;
     global_config.set_api_key(provider, Some(key.clone()));

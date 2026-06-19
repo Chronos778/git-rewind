@@ -233,16 +233,14 @@ async fn main() -> Result<()> {
                 print_diagnostics();
             }
 
-            let answer;
             let usage;
             if args.json {
                 let pb = make_spinner("Thinking...")?;
                 let result = ai::ask_question(&repo_state, &query).await;
                 pb.finish_and_clear();
                 let (ans, useg) = result?;
-                answer = ans;
                 usage = useg;
-                let json_output = serde_json::json!({ "answer": answer.trim() });
+                let json_output = serde_json::json!({ "answer": ans.trim() });
                 println!("{}", json_output);
             } else {
                 let pb = make_spinner("Thinking...")?;
@@ -253,8 +251,7 @@ async fn main() -> Result<()> {
                 })
                 .await;
                 pb.finish_and_clear();
-                let (ans, useg) = result?;
-                answer = ans;
+                let (_ans, useg) = result?;
                 usage = useg;
                 println!("\n");
             }
@@ -371,7 +368,7 @@ async fn main() -> Result<()> {
 
 /// Print diagnostic information about the configured provider, API base, and model.
 fn print_diagnostics() {
-    let cfg = config::load_config();
+    let cfg = config::load_config().unwrap_or_default();
 
     let resolved = provider::Provider::all().iter().find_map(|&p| {
         if std::env::var(p.env_key_name()).is_ok() {
