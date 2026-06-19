@@ -162,7 +162,7 @@ rewind commit
 ```
 
 **Ask Codebase Questions**  
-Ask the AI a specific question about your uncommitted changes or recent work:
+Ask the AI a specific question about your uncommitted changes or recent work. Backed by a generous 4096 token limit to support incredibly deep, complex answers:
 ```bash
 rewind ask "Did I finish implementing the user authentication?"
 ```
@@ -205,6 +205,7 @@ dist/
 
 ```bash
 # Update rewind to the latest version directly from GitHub Releases
+# (Uses cryptographic SHA256 verification to ensure binary integrity before replacing)
 rewind update
 
 # Uninstall rewind and remove all stored configuration/keys
