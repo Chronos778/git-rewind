@@ -10,7 +10,7 @@ pub async fn discover_best_model(
     let default_fallback = provider.default_model();
 
     let res = match client
-        .get(format!("{}/models", api_base))
+        .get(format!("{}/models", api_base.trim_end_matches('/')))
         .header("Authorization", format!("Bearer {}", api_key))
         .send()
         .await
