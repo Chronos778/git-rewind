@@ -154,11 +154,9 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(Commands::History) => {
+            let repo_state = git::get_repo_state()?;
             let brief_filename = ".rewind-brief.md";
-            let Ok(cwd) = std::env::current_dir() else {
-                anyhow::bail!("Could not determine current directory.");
-            };
-            let brief_path = cwd.join(brief_filename);
+            let brief_path = std::path::PathBuf::from(&repo_state.root).join(brief_filename);
 
             if brief_path.exists() {
                 if let Ok(content) = std::fs::read_to_string(&brief_path) {
