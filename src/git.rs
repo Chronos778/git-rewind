@@ -43,6 +43,8 @@ fn get_exclusions(repo_root: &Path) -> Vec<String> {
         // Minified assets
         "*.min.js",
         "*.min.css",
+        // Rewind brief itself
+        ".rewind-brief.md",
     ];
     for ext in default_excludes {
         exclusions.push(format!(":!{}", ext));
