@@ -132,7 +132,7 @@ async fn main() -> Result<()> {
             let chars = prompt.len();
             let words = prompt.split_whitespace().count();
             let approx_tokens = (chars / 4 + (words * 13 / 10)) / 2;
-            
+
             if args.json {
                 let json_output = serde_json::json!({
                     "approx_tokens": approx_tokens,
@@ -202,14 +202,14 @@ async fn main() -> Result<()> {
             let result = ai::generate_commit_message(&repo_state).await;
             pb.finish_and_clear();
             let (msg, usage) = result?;
-            
+
             if args.json {
                 let json_output = serde_json::json!({ "commit_message": msg.trim() });
                 println!("{}", json_output);
             } else {
                 println!("\n{}\n", msg);
             }
-            
+
             if let (true, Some((p, c))) = (args.verbose, usage) {
                 let telemetry = format!(
                     "{} Prompt: {} | Completion: {} | Total: {}",
@@ -232,7 +232,7 @@ async fn main() -> Result<()> {
             if args.verbose {
                 print_diagnostics();
             }
-            
+
             let answer;
             let usage;
             if args.json {
@@ -250,14 +250,15 @@ async fn main() -> Result<()> {
                 let result = ai::ask_question_streaming(&repo_state, &query, move || {
                     pb_clone.finish_and_clear();
                     println!();
-                }).await;
+                })
+                .await;
                 pb.finish_and_clear();
                 let (ans, useg) = result?;
                 answer = ans;
                 usage = useg;
                 println!("\n");
             }
-            
+
             if let (true, Some((p, c))) = (args.verbose, usage) {
                 let telemetry = format!(
                     "{} Prompt: {} | Completion: {} | Total: {}\n",

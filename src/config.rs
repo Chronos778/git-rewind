@@ -150,8 +150,10 @@ pub fn load_global_config() -> Result<Config> {
     if let Some(path) = get_config_path() {
         if path.exists() {
             let contents = fs::read_to_string(&path)?;
-            let config: Config = serde_json::from_str(&contents)
-                .context(format!("Failed to parse global config at {}", path.display()))?;
+            let config: Config = serde_json::from_str(&contents).context(format!(
+                "Failed to parse global config at {}",
+                path.display()
+            ))?;
             return Ok(config);
         }
     }
@@ -173,8 +175,10 @@ pub fn load_config() -> Result<Config> {
     let local_rc = search_dir.join(".rewindrc");
     if local_rc.exists() {
         let contents = fs::read_to_string(&local_rc)?;
-        let local_config: Config = serde_json::from_str(&contents)
-            .context(format!("Failed to parse local config at {}", local_rc.display()))?;
+        let local_config: Config = serde_json::from_str(&contents).context(format!(
+            "Failed to parse local config at {}",
+            local_rc.display()
+        ))?;
         base_config.merge(local_config);
     }
 

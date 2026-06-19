@@ -15,7 +15,7 @@ pub async fn analyze_repo(
 ) -> Result<(String, Option<(u32, u32)>)> {
     let cfg = crate::config::load_config()?;
     let mut actual_system_prompt = prompts::SYSTEM_PROMPT.to_string();
-    
+
     if let Some(custom) = cfg.system_prompt {
         actual_system_prompt.push_str("\n\nUser's Custom Instructions:\n");
         actual_system_prompt.push_str(&custom);
@@ -45,7 +45,7 @@ pub async fn analyze_repo_streaming(
     let user_prompt = prompts::build_user_prompt(state);
     let cfg = crate::config::load_config()?;
     let mut system_prompt = prompts::SYSTEM_PROMPT.to_string();
-    
+
     if let Some(custom) = cfg.system_prompt {
         system_prompt.push_str("\n\nUser's Custom Instructions:\n");
         system_prompt.push_str(&custom);
@@ -62,7 +62,7 @@ pub async fn ask_question_streaming(
 ) -> Result<(String, Option<(u32, u32)>)> {
     let cfg = crate::config::load_config()?;
     let mut system_prompt = "You are an expert AI pair programmer embedded in the user's terminal. Answer the user's question accurately based on their current repository state and diffs.".to_string();
-    
+
     if let Some(custom) = cfg.system_prompt {
         system_prompt.push_str("\n\nUser's Custom Instructions:\n");
         system_prompt.push_str(&custom);
@@ -77,13 +77,10 @@ pub async fn ask_question_streaming(
 }
 
 /// Ask a specific question about the repository state, returning a non-streaming response.
-pub async fn ask_question(
-    state: &RepoState,
-    query: &str,
-) -> Result<(String, Option<(u32, u32)>)> {
+pub async fn ask_question(state: &RepoState, query: &str) -> Result<(String, Option<(u32, u32)>)> {
     let cfg = crate::config::load_config()?;
     let mut system_prompt = "You are an expert AI pair programmer embedded in the user's terminal. Answer the user's question accurately based on their current repository state and diffs.".to_string();
-    
+
     if let Some(custom) = cfg.system_prompt {
         system_prompt.push_str("\n\nUser's Custom Instructions:\n");
         system_prompt.push_str(&custom);
@@ -101,7 +98,7 @@ pub async fn ask_question(
 pub async fn generate_commit_message(state: &RepoState) -> Result<(String, Option<(u32, u32)>)> {
     let cfg = crate::config::load_config()?;
     let mut system_prompt = "You are an expert developer. Generate a clean, descriptive, and conventional Git commit message based on the provided diff. Output ONLY the commit message. First line should be the subject. Then a blank line, then bullet points for details if needed.".to_string();
-    
+
     if let Some(custom) = cfg.system_prompt {
         system_prompt.push_str("\n\nUser's Custom Instructions:\n");
         system_prompt.push_str(&custom);
