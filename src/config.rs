@@ -89,7 +89,9 @@ impl Config {
         self.model_cache
             .get(provider.cache_key())
             .and_then(|entry| {
-                if entry.api_base == current_api_base && now.saturating_sub(entry.cached_at) < MODEL_CACHE_TTL_SECS {
+                if entry.api_base == current_api_base
+                    && now.saturating_sub(entry.cached_at) < MODEL_CACHE_TTL_SECS
+                {
                     Some(entry.model.clone())
                 } else {
                     None
