@@ -338,9 +338,16 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
 pub fn ensure_configured() -> Result<()> {
     let mut config = load_config();
 
-    // Check Env Vars or Config File (in priority order)
+    // 1. Check all environment variables first
     for &p in Provider::all() {
-        if env::var(p.env_key_name()).is_ok() || config.get_api_key(p).is_some() {
+        if env::var(p.env_key_name()).is_ok() {
+            return Ok(());
+        }
+    }
+
+    // 2. Check the configuration file
+    for &p in Provider::all() {
+        if config.get_api_key(p).is_some() {
             return Ok(());
         }
     }

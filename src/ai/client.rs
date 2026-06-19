@@ -16,10 +16,15 @@ const MAX_RESPONSE_TOKENS: u32 = 1500;
 const MAX_RETRIES: u32 = 3;
 
 fn resolve_provider_and_key(cfg: &config::Config) -> Result<(Provider, String)> {
+    // 1. Check all environment variables first (highest priority)
     for &provider in Provider::all() {
         if let Ok(key) = env::var(provider.env_key_name()) {
             return Ok((provider, key));
         }
+    }
+
+    // 2. Check the configuration file (fallback priority)
+    for &provider in Provider::all() {
         if let Some(key) = cfg.get_api_key(provider) {
             return Ok((provider, key.expose_secret().to_string()));
         }
