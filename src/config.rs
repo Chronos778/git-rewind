@@ -310,12 +310,7 @@ pub fn ensure_configured() -> Result<()> {
 
     // Check Env Vars or Config File (in priority order)
     for &p in Provider::all() {
-        if env::var(p.env_key_name()).is_ok() {
-            return Ok(());
-        }
-    }
-    for &p in Provider::all() {
-        if config.get_api_key(p).is_some() {
+        if env::var(p.env_key_name()).is_ok() || config.get_api_key(p).is_some() {
             return Ok(());
         }
     }
