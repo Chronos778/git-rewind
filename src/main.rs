@@ -321,6 +321,7 @@ fn print_diagnostics() {
         let model = std::env::var("OPENAI_MODEL")
             .ok()
             .or_else(|| cfg.get_model(p).cloned())
+            .or_else(|| cfg.get_cached_model(p))
             .unwrap_or_else(|| format!("{} (auto-discover)", p.default_model()));
 
         eprintln!(
