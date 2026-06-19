@@ -18,6 +18,7 @@ const MODEL_CACHE_TTL_SECS: u64 = 86_400;
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CachedModel {
     pub model: String,
+    pub api_base: String,
     /// Unix timestamp (seconds) when the model was discovered and cached.
     pub cached_at: u64,
 }
@@ -79,8 +80,8 @@ impl Config {
         }
     }
 
-    /// Return the cached model for a provider if it is still within the TTL window.
-    pub fn get_cached_model(&self, provider: Provider) -> Option<String> {
+    /// Return the cached model for a provider if it matches the current api_base and is within the TTL window.
+    pub fn get_cached_model(&self, provider: Provider, current_api_base: &str) -> Option<String> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
@@ -88,7 +89,7 @@ impl Config {
         self.model_cache
             .get(provider.cache_key())
             .and_then(|entry| {
-                if now.saturating_sub(entry.cached_at) < MODEL_CACHE_TTL_SECS {
+                if entry.api_base == current_api_base && now.saturating_sub(entry.cached_at) < MODEL_CACHE_TTL_SECS {
                     Some(entry.model.clone())
                 } else {
                     None
@@ -96,8 +97,8 @@ impl Config {
             })
     }
 
-    /// Store a discovered model in the cache with the current timestamp.
-    pub fn set_cached_model(&mut self, provider: Provider, model: String) {
+    /// Store a discovered model in the cache with the current timestamp and api_base.
+    pub fn set_cached_model(&mut self, provider: Provider, model: String, api_base: String) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
@@ -106,6 +107,7 @@ impl Config {
             provider.cache_key().to_string(),
             CachedModel {
                 model,
+                api_base,
                 cached_at: now,
             },
         );
