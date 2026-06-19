@@ -59,7 +59,7 @@ async fn setup_client(
             } else {
                 let discovered = discover_best_model(&client, &api_base, api_key, provider).await;
                 // Persist to config so the next invocation hits the cache
-                let mut fresh_cfg = config::load_config();
+                let mut fresh_cfg = config::load_global_config();
                 fresh_cfg.set_cached_model(provider, discovered.clone());
                 let _ = config::save_config(&fresh_cfg);
                 discovered
