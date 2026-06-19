@@ -147,9 +147,15 @@ pub fn load_config() -> Config {
 
     // 1. Load global config
     if let Some(path) = get_config_path() {
-        if let Ok(contents) = fs::read_to_string(path) {
-            if let Ok(config) = serde_json::from_str(&contents) {
-                base_config = config;
+        if let Ok(contents) = fs::read_to_string(&path) {
+            match serde_json::from_str(&contents) {
+                Ok(config) => base_config = config,
+                Err(e) => eprintln!(
+                    "{} Failed to parse global config at {}: {}",
+                    "[WARN]".yellow(),
+                    path.display(),
+                    e
+                ),
             }
         }
     }
@@ -165,9 +171,15 @@ pub fn load_config() -> Config {
 
     let local_rc = search_dir.join(".rewindrc");
     if local_rc.exists() {
-        if let Ok(contents) = fs::read_to_string(local_rc) {
-            if let Ok(local_config) = serde_json::from_str::<Config>(&contents) {
-                base_config.merge(local_config);
+        if let Ok(contents) = fs::read_to_string(&local_rc) {
+            match serde_json::from_str::<Config>(&contents) {
+                Ok(local_config) => base_config.merge(local_config),
+                Err(e) => eprintln!(
+                    "{} Failed to parse {}: {}",
+                    "[WARN]".yellow(),
+                    local_rc.display(),
+                    e
+                ),
             }
         }
     }
