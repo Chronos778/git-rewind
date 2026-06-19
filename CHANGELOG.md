@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0](https://github.com/Chronos778/git-rewind/compare/v1.6.0...v1.7.0) - 2026-06-19
+
+### Added
+
+- implement core CLI structure, AI integration, and auto-update functionality
+- implement cryptographically secure sha256 checksum verification for updates
+
+### Fixed
+
+- resolve unresolved imports and API changes for manual self_update checksum verification
+
+### Other
+
+- optimize AI token constraints and error boundaries
+
 ## [1.6.0](https://github.com/Chronos778/git-rewind/compare/v1.5.0...v1.6.0) - 2026-06-19
 
 ### Added
