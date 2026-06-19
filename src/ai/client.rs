@@ -19,14 +19,20 @@ fn resolve_provider_and_key(cfg: &config::Config) -> Result<(Provider, String)> 
     // 1. Check all environment variables first (highest priority)
     for &provider in Provider::all() {
         if let Ok(key) = env::var(provider.env_key_name()) {
-            return Ok((provider, key));
+            let k = key.trim().to_string();
+            if !k.is_empty() {
+                return Ok((provider, k));
+            }
         }
     }
 
     // 2. Check the configuration file (fallback priority)
     for &provider in Provider::all() {
         if let Some(key) = cfg.get_api_key(provider) {
-            return Ok((provider, key.expose_secret().to_string()));
+            let k = key.expose_secret().trim().to_string();
+            if !k.is_empty() {
+                return Ok((provider, k));
+            }
         }
     }
 
@@ -219,6 +225,9 @@ pub async fn api_call_streaming(
 
             if let Some(data) = line.strip_prefix("data: ") {
                 if data.trim() == "[DONE]" {
+                    if let Some(callback) = on_first_token.take() {
+                        callback();
+                    }
                     return Ok((full_response, usage));
                 }
                 if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(data) {

@@ -307,10 +307,26 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
             let effective_config = load_config();
             println!("{} \n", "[ EFFECTIVE API KEYS & MODELS ]".bold());
             for &p in Provider::all() {
-                let model = match effective_config.get_model(p) {
-                    Some(m) => m.clone(),
-                    None => format!("{} (default)", p.default_model()),
+                let api_base = env::var("OPENAI_API_BASE")
+                    .unwrap_or_else(|_| p.default_api_base().to_string())
+                    .trim_end_matches('/')
+                    .to_string();
+
+                let mut model_source = "default";
+                let model = if let Ok(env_model) = env::var("OPENAI_MODEL") {
+                    model_source = "env";
+                    env_model
+                } else if let Some(m) = effective_config.get_model(p) {
+                    model_source = "config";
+                    m.clone()
+                } else if let Some(cached) = effective_config.get_cached_model(p, &api_base) {
+                    model_source = "auto-discovered";
+                    cached
+                } else {
+                    p.default_model().to_string()
                 };
+
+                let model_str = format!("{} (from {})", model, model_source);
 
                 if let Ok(env_key) = env::var(p.env_key_name()) {
                     let secret = SecretString::from(env_key);
@@ -318,14 +334,14 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
                         "{}: {} (from env) [Model: {}]",
                         p.display_name().green(),
                         mask_key(&secret),
-                        model
+                        model_str
                     );
                 } else if let Some(key) = effective_config.get_api_key(p) {
                     println!(
                         "{}: {} (from config) [Model: {}]",
                         p.display_name().green(),
                         mask_key(key),
-                        model
+                        model_str
                     );
                 } else {
                     println!("{}: Not set", p.display_name().bright_black());
@@ -344,15 +360,19 @@ pub fn ensure_configured() -> Result<()> {
 
     // 1. Check all environment variables first
     for &p in Provider::all() {
-        if env::var(p.env_key_name()).is_ok() {
-            return Ok(());
+        if let Ok(key) = env::var(p.env_key_name()) {
+            if !key.trim().is_empty() {
+                return Ok(());
+            }
         }
     }
 
     // 2. Check the configuration file
     for &p in Provider::all() {
-        if config.get_api_key(p).is_some() {
-            return Ok(());
+        if let Some(key) = config.get_api_key(p) {
+            if !key.expose_secret().trim().is_empty() {
+                return Ok(());
+            }
         }
     }
 
