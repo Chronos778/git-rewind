@@ -161,6 +161,7 @@ pub fn get_repo_state() -> Result<RepoState> {
     // We add "*" so it defaults to including everything else.
     // In libgit2 pathspecs, `:!` is the standard for exclusions.
     diff_opts.pathspec("*");
+    diff_opts.include_untracked(true);
 
     let head_tree = repo.head().and_then(|h| h.peel_to_tree()).ok();
 
@@ -178,27 +179,29 @@ pub fn get_repo_state() -> Result<RepoState> {
 
     let mut diff_cached_str = String::new();
     let _ = diff_cached.print(DiffFormat::Patch, |_delta, _hunk, line| {
-        if diff_cached_str.len() < MAX_GIT_DIFF_BYTES {
-            let prefix = match line.origin() {
-                '+' | '-' | ' ' => line.origin().to_string(),
-                _ => String::new(),
-            };
-            diff_cached_str.push_str(&prefix);
-            diff_cached_str.push_str(&String::from_utf8_lossy(line.content()));
+        if diff_cached_str.len() >= MAX_GIT_DIFF_BYTES {
+            return false;
         }
+        let prefix = match line.origin() {
+            '+' | '-' | ' ' => line.origin().to_string(),
+            _ => String::new(),
+        };
+        diff_cached_str.push_str(&prefix);
+        diff_cached_str.push_str(&String::from_utf8_lossy(line.content()));
         true
     });
 
     let mut diff_uncached_str = String::new();
     let _ = diff_uncached.print(DiffFormat::Patch, |_delta, _hunk, line| {
-        if diff_uncached_str.len() < MAX_GIT_DIFF_BYTES {
-            let prefix = match line.origin() {
-                '+' | '-' | ' ' => line.origin().to_string(),
-                _ => String::new(),
-            };
-            diff_uncached_str.push_str(&prefix);
-            diff_uncached_str.push_str(&String::from_utf8_lossy(line.content()));
+        if diff_uncached_str.len() >= MAX_GIT_DIFF_BYTES {
+            return false;
         }
+        let prefix = match line.origin() {
+            '+' | '-' | ' ' => line.origin().to_string(),
+            _ => String::new(),
+        };
+        diff_uncached_str.push_str(&prefix);
+        diff_uncached_str.push_str(&String::from_utf8_lossy(line.content()));
         true
     });
 
