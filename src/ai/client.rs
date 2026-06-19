@@ -70,7 +70,7 @@ async fn setup_client(
             } else {
                 let discovered = discover_best_model(&client, &api_base, api_key, provider).await;
                 // Persist to config so the next invocation hits the cache
-                let mut fresh_cfg = config::load_global_config();
+                let mut fresh_cfg = config::load_global_config()?;
                 fresh_cfg.set_cached_model(provider, discovered.clone(), api_base.clone());
                 let _ = config::save_config(&fresh_cfg);
                 discovered
@@ -86,7 +86,7 @@ pub async fn api_call(
     system_prompt: &str,
     user_prompt: &str,
 ) -> Result<(String, Option<(u32, u32)>)> {
-    let cfg = config::load_config();
+    let cfg = config::load_config()?;
     let (provider, api_key) = resolve_provider_and_key(&cfg)?;
     let (client, api_base, model) = setup_client(provider, &api_key, &cfg).await?;
 
@@ -160,7 +160,7 @@ pub async fn api_call_streaming(
     user_prompt: &str,
     on_first_token: impl FnOnce(),
 ) -> Result<(String, Option<(u32, u32)>)> {
-    let cfg = config::load_config();
+    let cfg = config::load_config()?;
     let (provider, api_key) = resolve_provider_and_key(&cfg)?;
     let (client, api_base, model) = setup_client(provider, &api_key, &cfg).await?;
 

@@ -13,7 +13,7 @@ pub async fn analyze_repo(
     short: bool,
     json_format: bool,
 ) -> Result<(String, Option<(u32, u32)>)> {
-    let cfg = crate::config::load_config();
+    let cfg = crate::config::load_config()?;
     let mut actual_system_prompt = prompts::SYSTEM_PROMPT.to_string();
     
     if let Some(custom) = cfg.system_prompt {
@@ -43,7 +43,7 @@ pub async fn analyze_repo_streaming(
     on_first_token: impl FnOnce(),
 ) -> Result<(String, Option<(u32, u32)>)> {
     let user_prompt = prompts::build_user_prompt(state);
-    let cfg = crate::config::load_config();
+    let cfg = crate::config::load_config()?;
     let mut system_prompt = prompts::SYSTEM_PROMPT.to_string();
     
     if let Some(custom) = cfg.system_prompt {
@@ -60,7 +60,7 @@ pub async fn ask_question_streaming(
     query: &str,
     on_first_token: impl FnOnce(),
 ) -> Result<(String, Option<(u32, u32)>)> {
-    let cfg = crate::config::load_config();
+    let cfg = crate::config::load_config()?;
     let mut system_prompt = "You are an expert AI pair programmer embedded in the user's terminal. Answer the user's question accurately based on their current repository state and diffs.".to_string();
     
     if let Some(custom) = cfg.system_prompt {
@@ -81,7 +81,7 @@ pub async fn ask_question(
     state: &RepoState,
     query: &str,
 ) -> Result<(String, Option<(u32, u32)>)> {
-    let cfg = crate::config::load_config();
+    let cfg = crate::config::load_config()?;
     let mut system_prompt = "You are an expert AI pair programmer embedded in the user's terminal. Answer the user's question accurately based on their current repository state and diffs.".to_string();
     
     if let Some(custom) = cfg.system_prompt {
@@ -99,7 +99,7 @@ pub async fn ask_question(
 
 /// Generate a concise commit message based on the current repository diff along with token usage telemetry.
 pub async fn generate_commit_message(state: &RepoState) -> Result<(String, Option<(u32, u32)>)> {
-    let cfg = crate::config::load_config();
+    let cfg = crate::config::load_config()?;
     let mut system_prompt = "You are an expert developer. Generate a clean, descriptive, and conventional Git commit message based on the provided diff. Output ONLY the commit message. First line should be the subject. Then a blank line, then bullet points for details if needed.".to_string();
     
     if let Some(custom) = cfg.system_prompt {

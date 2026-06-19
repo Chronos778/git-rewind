@@ -146,28 +146,20 @@ fn get_config_path() -> Option<std::path::PathBuf> {
         .map(|proj_dirs| proj_dirs.config_dir().join("config.json"))
 }
 
-pub fn load_global_config() -> Config {
-    let mut base_config = Config::default();
-
+pub fn load_global_config() -> Result<Config> {
     if let Some(path) = get_config_path() {
-        if let Ok(contents) = fs::read_to_string(&path) {
-            match serde_json::from_str(&contents) {
-                Ok(config) => base_config = config,
-                Err(e) => eprintln!(
-                    "{} Failed to parse global config at {}: {}",
-                    "[WARN]".yellow(),
-                    path.display(),
-                    e
-                ),
-            }
+        if path.exists() {
+            let contents = fs::read_to_string(&path)?;
+            let config: Config = serde_json::from_str(&contents)
+                .context(format!("Failed to parse global config at {}", path.display()))?;
+            return Ok(config);
         }
     }
-
-    base_config
+    Ok(Config::default())
 }
 
-pub fn load_config() -> Config {
-    let mut base_config = load_global_config();
+pub fn load_config() -> Result<Config> {
+    let mut base_config = load_global_config()?;
 
     // 2. Load and merge local .rewindrc
     let search_dir = match git2::Repository::discover(".") {
@@ -180,20 +172,13 @@ pub fn load_config() -> Config {
 
     let local_rc = search_dir.join(".rewindrc");
     if local_rc.exists() {
-        if let Ok(contents) = fs::read_to_string(&local_rc) {
-            match serde_json::from_str::<Config>(&contents) {
-                Ok(local_config) => base_config.merge(local_config),
-                Err(e) => eprintln!(
-                    "{} Failed to parse {}: {}",
-                    "[WARN]".yellow(),
-                    local_rc.display(),
-                    e
-                ),
-            }
-        }
+        let contents = fs::read_to_string(&local_rc)?;
+        let local_config: Config = serde_json::from_str(&contents)
+            .context(format!("Failed to parse local config at {}", local_rc.display()))?;
+        base_config.merge(local_config);
     }
 
-    base_config
+    Ok(base_config)
 }
 
 pub fn save_config(config: &Config) -> Result<()> {
@@ -238,7 +223,7 @@ fn mask_key(secret: &SecretString) -> String {
 }
 
 pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
-    let mut config = load_global_config();
+    let mut config = load_global_config()?;
 
     match action {
         ConfigCommands::Set { provider, key } => {
@@ -282,6 +267,7 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
             let p = Provider::from_name(&provider)?;
             config.set_api_key(p, None);
             config.set_model(p, None);
+            config.model_cache.remove(p.cache_key());
             save_config(&config)?;
             println!(
                 "{} Settings for {} have been cleared.",
@@ -304,7 +290,7 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
             }
         }
         ConfigCommands::Show => {
-            let effective_config = load_config();
+            let effective_config = load_config()?;
             println!("{} \n", "[ EFFECTIVE API KEYS & MODELS ]".bold());
             for &p in Provider::all() {
                 let api_base = env::var("OPENAI_API_BASE")
@@ -356,7 +342,7 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
 }
 
 pub fn ensure_configured() -> Result<()> {
-    let mut config = load_config();
+    let mut config = load_config()?;
 
     // 1. Check all environment variables first
     for &p in Provider::all() {
@@ -405,7 +391,7 @@ pub fn ensure_configured() -> Result<()> {
     }
     config.set_api_key(provider, Some(key));
 
-    let mut global_config = load_global_config();
+    let mut global_config = load_global_config()?;
     global_config.set_api_key(provider, Some(key.clone()));
     save_config(&global_config).context("Failed to save configuration after first-time setup")?;
     Ok(())
