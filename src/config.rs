@@ -156,7 +156,10 @@ pub fn load_config() -> Config {
 
     // 2. Load and merge local .rewindrc
     let search_dir = match git2::Repository::discover(".") {
-        Ok(repo) => repo.workdir().map(|p| p.to_path_buf()).unwrap_or_else(|| env::current_dir().unwrap_or_default()),
+        Ok(repo) => repo
+            .workdir()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| env::current_dir().unwrap_or_default()),
         Err(_) => env::current_dir().unwrap_or_default(),
     };
 
@@ -195,21 +198,21 @@ where
 
 fn mask_key(secret: &SecretString) -> String {
     let k = secret.expose_secret();
-    if k.len() <= 8 {
+    let chars: Vec<char> = k.chars().collect();
+    if chars.len() <= 8 {
         return "********".to_string();
     }
-    let b = k.as_bytes();
-    let n = b.len();
+    let n = chars.len();
     format!(
         "{}{}{}{}...{}{}{}{}",
-        b[0] as char,
-        b[1] as char,
-        b[2] as char,
-        b[3] as char,
-        b[n - 4] as char,
-        b[n - 3] as char,
-        b[n - 2] as char,
-        b[n - 1] as char
+        chars[0],
+        chars[1],
+        chars[2],
+        chars[3],
+        chars[n - 4],
+        chars[n - 3],
+        chars[n - 2],
+        chars[n - 1]
     )
 }
 
