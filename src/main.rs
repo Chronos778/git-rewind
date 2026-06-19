@@ -352,7 +352,7 @@ fn save_brief(summary: &str, repo_root: &str) {
 
     match std::fs::write(&brief_path, file_content) {
         Ok(()) => {
-            println!(
+            eprintln!(
                 "{} Brief automatically saved to: {}",
                 "[INFO]".cyan(),
                 brief_path.display().to_string().bold()
