@@ -142,10 +142,9 @@ fn get_config_path() -> Option<std::path::PathBuf> {
         .map(|proj_dirs| proj_dirs.config_dir().join("config.json"))
 }
 
-pub fn load_config() -> Config {
+pub fn load_global_config() -> Config {
     let mut base_config = Config::default();
 
-    // 1. Load global config
     if let Some(path) = get_config_path() {
         if let Ok(contents) = fs::read_to_string(&path) {
             match serde_json::from_str(&contents) {
@@ -159,6 +158,12 @@ pub fn load_config() -> Config {
             }
         }
     }
+
+    base_config
+}
+
+pub fn load_config() -> Config {
+    let mut base_config = load_global_config();
 
     // 2. Load and merge local .rewindrc
     let search_dir = match git2::Repository::discover(".") {
@@ -229,7 +234,7 @@ fn mask_key(secret: &SecretString) -> String {
 }
 
 pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
-    let mut config = load_config();
+    let mut config = load_global_config();
 
     match action {
         ConfigCommands::Set { provider, key } => {
@@ -295,9 +300,10 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
             }
         }
         ConfigCommands::Show => {
-            println!("{} \n", "[ CONFIGURED API KEYS & MODELS ]".bold());
+            let effective_config = load_config();
+            println!("{} \n", "[ EFFECTIVE API KEYS & MODELS ]".bold());
             for &p in Provider::all() {
-                let model = match config.get_model(p) {
+                let model = match effective_config.get_model(p) {
                     Some(m) => m.clone(),
                     None => format!("{} (default)", p.default_model()),
                 };
@@ -310,7 +316,7 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
                         mask_key(&secret),
                         model
                     );
-                } else if let Some(key) = config.get_api_key(p) {
+                } else if let Some(key) = effective_config.get_api_key(p) {
                     println!(
                         "{}: {} (from config) [Model: {}]",
                         p.display_name().green(),
@@ -321,7 +327,7 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
                     println!("{}: Not set", p.display_name().bright_black());
                 }
             }
-            if let Some(prompt) = &config.system_prompt {
+            if let Some(prompt) = &effective_config.system_prompt {
                 println!("\n{}: {}", "Custom System Prompt".cyan(), prompt);
             }
         }
