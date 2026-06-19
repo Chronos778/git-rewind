@@ -65,7 +65,7 @@ async fn setup_client(
         Some(m) => m,
         None => {
             // Serve from cache when fresh — avoids a network round-trip on every run
-            if let Some(cached) = cfg.get_cached_model(provider) {
+            if let Some(cached) = cfg.get_cached_model(provider, &api_base) {
                 cached
             } else {
                 let discovered = discover_best_model(&client, &api_base, api_key, provider).await;
