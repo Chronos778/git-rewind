@@ -22,78 +22,18 @@ pub fn build_user_prompt(state: &RepoState) -> String {
     );
 
     if !state.diff_cached.is_empty() {
-        let diff = truncate_lines(&state.diff_cached, crate::git::MAX_GIT_DIFF_BYTES);
-        user_prompt.push_str(&format!("- Staged Changes:\n{}\n", diff));
+        user_prompt.push_str(&format!("- Staged Changes:\n{}\n", state.diff_cached));
     }
 
     if !state.diff.is_empty() {
-        let diff = truncate_lines(&state.diff, crate::git::MAX_GIT_DIFF_BYTES);
-        user_prompt.push_str(&format!("- Unstaged Changes:\n{}\n", diff));
+        user_prompt.push_str(&format!("- Unstaged Changes:\n{}\n", state.diff));
     }
     user_prompt
-}
-
-/// Truncates a string to roughly `max_bytes` while preserving line breaks.
-/// If it gets truncated, it appends an indicator.
-pub fn truncate_lines(s: &str, max_bytes: usize) -> String {
-    if s.len() <= max_bytes {
-        return s.to_string();
-    }
-
-    let mut current_bytes = 0;
-    let mut truncated = String::new();
-
-    for line in s.lines() {
-        let line_len = line.len() + 1; // +1 for newline
-        if current_bytes + line_len > max_bytes {
-            truncated.push_str("\n... [Diff truncated due to length] ...\n");
-            break;
-        }
-        truncated.push_str(line);
-        truncated.push('\n');
-        current_bytes += line_len;
-    }
-
-    truncated.trim_end().to_string()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_truncate_lines_short_string() {
-        let input = "hello\nworld";
-        assert_eq!(truncate_lines(input, 100), input);
-    }
-
-    #[test]
-    fn test_truncate_lines_exact_boundary() {
-        let input = "hello\nworld\n"; // 12 bytes
-        assert_eq!(truncate_lines(input, 12), "hello\nworld\n");
-    }
-
-    #[test]
-    fn test_truncate_lines_triggers_truncation() {
-        let input = "line1\nline2\nline3\nline4\nline5";
-        let result = truncate_lines(input, 12);
-        assert!(result.contains("line1"));
-        assert!(result.contains("line2"));
-        assert!(result.contains("[Diff truncated"));
-        assert!(!result.contains("line5"));
-    }
-
-    #[test]
-    fn test_truncate_lines_empty_string() {
-        assert_eq!(truncate_lines("", 100), "");
-    }
-
-    #[test]
-    fn test_truncate_lines_single_long_line() {
-        let input = "a".repeat(200);
-        let result = truncate_lines(&input, 50);
-        assert!(result.contains("[Diff truncated"));
-    }
 
     #[test]
     fn test_build_user_prompt_basic() {

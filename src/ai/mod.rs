@@ -74,6 +74,5 @@ pub async fn generate_commit_message(state: &RepoState) -> Result<(String, Optio
         anyhow::bail!("No changes found to generate a commit message for.");
     }
 
-    let diff = prompts::truncate_lines(&user_prompt, crate::git::MAX_GIT_DIFF_BYTES);
-    client::api_call(system_prompt, &diff).await
+    client::api_call(system_prompt, &user_prompt).await
 }

@@ -371,7 +371,7 @@ fn save_brief(summary: &str, repo_root: &str) {
                     }
                 }
             }
-            
+
             if should_append {
                 use std::io::Write;
                 if let Ok(mut file) = std::fs::OpenOptions::new()

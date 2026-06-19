@@ -184,8 +184,11 @@ pub fn get_repo_state() -> Result<RepoState> {
         .context("Failed to generate workspace diff")?;
 
     let mut diff_cached_str = String::new();
+    let mut diff_cached_truncated = false;
     let _ = diff_cached.print(DiffFormat::Patch, |_delta, _hunk, line| {
-        if diff_cached_str.len() >= MAX_GIT_DIFF_BYTES {
+        let content = String::from_utf8_lossy(line.content());
+        if diff_cached_str.len() + content.len() > MAX_GIT_DIFF_BYTES {
+            diff_cached_truncated = true;
             return false;
         }
         let prefix = match line.origin() {
@@ -193,29 +196,38 @@ pub fn get_repo_state() -> Result<RepoState> {
             _ => String::new(),
         };
         diff_cached_str.push_str(&prefix);
-        diff_cached_str.push_str(&String::from_utf8_lossy(line.content()));
+        diff_cached_str.push_str(&content);
         true
     });
+    if diff_cached_truncated {
+        diff_cached_str.push_str("\n... [Diff truncated due to length] ...\n");
+    }
 
-    let mut diff_uncached_str = String::new();
+    let mut diff_str = String::new();
+    let mut diff_truncated = false;
     let _ = diff_uncached.print(DiffFormat::Patch, |_delta, _hunk, line| {
-        if diff_uncached_str.len() >= MAX_GIT_DIFF_BYTES {
+        let content = String::from_utf8_lossy(line.content());
+        if diff_str.len() + content.len() > MAX_GIT_DIFF_BYTES {
+            diff_truncated = true;
             return false;
         }
         let prefix = match line.origin() {
             '+' | '-' | ' ' => line.origin().to_string(),
             _ => String::new(),
         };
-        diff_uncached_str.push_str(&prefix);
-        diff_uncached_str.push_str(&String::from_utf8_lossy(line.content()));
+        diff_str.push_str(&prefix);
+        diff_str.push_str(&content);
         true
     });
+    if diff_truncated {
+        diff_str.push_str("\n... [Diff truncated due to length] ...\n");
+    }
 
     Ok(RepoState {
         branch: branch.trim().to_string(),
         status: status_str.trim().to_string(),
         log: log.trim().to_string(),
-        diff: diff_uncached_str.trim().to_string(),
+        diff: diff_str.trim().to_string(),
         diff_cached: diff_cached_str.trim().to_string(),
         root: root_str,
     })
