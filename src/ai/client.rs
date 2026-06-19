@@ -10,7 +10,7 @@ use std::io::Write;
 use super::models::discover_best_model;
 
 /// Maximum number of tokens the AI can return in a single response.
-const MAX_RESPONSE_TOKENS: u32 = 1500;
+const MAX_RESPONSE_TOKENS: u32 = 4096;
 
 /// Maximum API retries.
 const MAX_RETRIES: u32 = 3;
@@ -70,9 +70,10 @@ async fn setup_client(
             } else {
                 let discovered = discover_best_model(&client, &api_base, api_key, provider).await;
                 // Persist to config so the next invocation hits the cache
-                let mut fresh_cfg = config::load_global_config()?;
-                fresh_cfg.set_cached_model(provider, discovered.clone(), api_base.clone());
-                let _ = config::save_config(&fresh_cfg);
+                if let Ok(mut fresh_cfg) = config::load_global_config() {
+                    fresh_cfg.set_cached_model(provider, discovered.clone(), api_base.clone());
+                    let _ = config::save_config(&fresh_cfg);
+                }
                 discovered
             }
         }
