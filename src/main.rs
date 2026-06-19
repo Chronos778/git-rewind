@@ -457,6 +457,9 @@ fn save_brief(summary: &str, repo_root: &str) {
 }
 
 fn update_binary() -> Result<()> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+
     println!("Checking for updates...");
 
     let target = self_update::get_target();
@@ -465,31 +468,125 @@ fn update_binary() -> Result<()> {
     } else {
         ".tar.gz"
     };
-    let identifier = format!("{}{}", target, archive_ext);
 
-    let status = self_update::backends::github::Update::configure()
+    let releases = self_update::backends::github::ReleaseList::configure()
         .repo_owner("Chronos778")
         .repo_name("git-rewind")
-        .bin_name("rewind")
-        .identifier(&identifier)
-        .show_download_progress(true)
-        .current_version(self_update::cargo_crate_version!())
         .build()?
-        .update()?;
+        .fetch()?;
 
-    if status.updated() {
-        println!(
-            "{} Updated successfully to version {}.",
-            "[SUCCESS]".green(),
-            status.version()
-        );
-    } else {
+    if releases.is_empty() {
+        println!("No releases found.");
+        return Ok(());
+    }
+
+    let latest = &releases[0];
+    let current_version = self_update::cargo_crate_version!();
+
+    if !self_update::version::bump_is_greater(current_version, &latest.version)? {
         println!(
             "{} You are already running the latest version ({}).",
             "[INFO]".cyan(),
-            status.version()
+            current_version
+        );
+        return Ok(());
+    }
+
+    println!(
+        "New release found! {} --> {}",
+        current_version, latest.version
+    );
+
+    let archive_asset = latest
+        .assets
+        .iter()
+        .find(|a| a.name.contains(target) && a.name.ends_with(archive_ext))
+        .ok_or_else(|| anyhow::anyhow!("No compatible archive found for your platform."))?;
+
+    let checksum_asset = latest
+        .assets
+        .iter()
+        .find(|a| a.name.contains(target) && a.name.ends_with(".sha256"))
+        .ok_or_else(|| anyhow::anyhow!("No checksum found for the release."))?;
+
+    let tmp_dir = tempfile::Builder::new().prefix("self_update").tempdir()?;
+    let archive_path = tmp_dir.path().join(&archive_asset.name);
+    let checksum_path = tmp_dir.path().join(&checksum_asset.name);
+
+    println!("Downloading archive...");
+    let mut archive_file = std::fs::File::create(&archive_path)?;
+    self_update::Download::from_url(&archive_asset.download_url)
+        .show_progress(true)
+        .download_to(&mut archive_file)?;
+
+    println!("Downloading checksum...");
+    let mut checksum_file = std::fs::File::create(&checksum_path)?;
+    self_update::Download::from_url(&checksum_asset.download_url)
+        .show_progress(true)
+        .download_to(&mut checksum_file)?;
+
+    let checksum_content = std::fs::read_to_string(&checksum_path)?;
+    let expected_hash = checksum_content
+        .split_whitespace()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("Checksum file is empty or malformed."))?;
+
+    println!("Verifying SHA256 checksum...");
+    let mut archive_file = std::fs::File::open(&archive_path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0; 8192];
+    loop {
+        let n = archive_file.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buffer[..n]);
+    }
+    let actual_hash = hex::encode(hasher.finalize());
+
+    if expected_hash != actual_hash {
+        anyhow::bail!(
+            "Checksum mismatch! Expected: {}, but got: {}",
+            expected_hash,
+            actual_hash
         );
     }
+    println!("{} Checksum verified.", "[SUCCESS]".green());
+
+    println!("Extracting archive...");
+    let archive_kind = if cfg!(target_os = "windows") {
+        self_update::ArchiveKind::Zip
+    } else {
+        self_update::ArchiveKind::Tar(Some(self_update::Compression::Gz))
+    };
+
+    self_update::Extract::from_source(&archive_path)
+        .archive(archive_kind)
+        .extract_into(tmp_dir.path())?;
+
+    println!("Replacing binary file...");
+    let exe_suffix = std::env::consts::EXE_SUFFIX;
+    let expected_bin_name = format!("rewind{}", exe_suffix);
+
+    let extracted_bin = walkdir::WalkDir::new(tmp_dir.path())
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .find(|e| e.file_name().to_string_lossy() == expected_bin_name)
+        .map(|e| e.into_path())
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Extracted binary '{}' not found in archive.",
+                expected_bin_name
+            )
+        })?;
+
+    self_update::Move::from_source(&extracted_bin).replace_using_temp(&std::env::current_exe()?)?;
+
+    println!(
+        "{} Updated successfully to version {}.",
+        "[SUCCESS]".green(),
+        latest.version
+    );
 
     Ok(())
 }
