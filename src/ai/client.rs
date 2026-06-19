@@ -35,8 +35,10 @@ async fn setup_client(
     api_key: &str,
     cfg: &config::Config,
 ) -> Result<(Client, String, String)> {
-    let api_base =
-        env::var("OPENAI_API_BASE").unwrap_or_else(|_| provider.default_api_base().to_string());
+    let api_base = env::var("OPENAI_API_BASE")
+        .unwrap_or_else(|_| provider.default_api_base().to_string())
+        .trim_end_matches('/')
+        .to_string();
 
     let maybe_model = env::var("OPENAI_MODEL")
         .ok()
