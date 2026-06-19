@@ -155,13 +155,16 @@ pub fn load_config() -> Config {
     }
 
     // 2. Load and merge local .rewindrc
-    if let Ok(cwd) = env::current_dir() {
-        let local_rc = cwd.join(".rewindrc");
-        if local_rc.exists() {
-            if let Ok(contents) = fs::read_to_string(local_rc) {
-                if let Ok(local_config) = serde_json::from_str::<Config>(&contents) {
-                    base_config.merge(local_config);
-                }
+    let search_dir = match git2::Repository::discover(".") {
+        Ok(repo) => repo.workdir().map(|p| p.to_path_buf()).unwrap_or_else(|| env::current_dir().unwrap_or_default()),
+        Err(_) => env::current_dir().unwrap_or_default(),
+    };
+
+    let local_rc = search_dir.join(".rewindrc");
+    if local_rc.exists() {
+        if let Ok(contents) = fs::read_to_string(local_rc) {
+            if let Ok(local_config) = serde_json::from_str::<Config>(&contents) {
+                base_config.merge(local_config);
             }
         }
     }
