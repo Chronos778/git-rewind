@@ -24,7 +24,7 @@ struct Args {
     dry_run: bool,
 
     /// Output the analysis in raw JSON format
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     json: bool,
 
     /// Generate a very short summary (2-sentence maximum)
@@ -199,8 +199,9 @@ async fn main() -> Result<()> {
                 print_diagnostics();
             }
             let pb = make_spinner("Generating commit message...")?;
-            let (msg, usage) = ai::generate_commit_message(&repo_state).await?;
+            let result = ai::generate_commit_message(&repo_state).await;
             pb.finish_and_clear();
+            let (msg, usage) = result?;
             
             if args.json {
                 let json_output = serde_json::json!({ "commit_message": msg.trim() });
@@ -236,18 +237,22 @@ async fn main() -> Result<()> {
             let usage;
             if args.json {
                 let pb = make_spinner("Thinking...")?;
-                let (ans, useg) = ai::ask_question(&repo_state, &query).await?;
+                let result = ai::ask_question(&repo_state, &query).await;
                 pb.finish_and_clear();
+                let (ans, useg) = result?;
                 answer = ans;
                 usage = useg;
                 let json_output = serde_json::json!({ "answer": answer.trim() });
                 println!("{}", json_output);
             } else {
                 let pb = make_spinner("Thinking...")?;
-                let (ans, useg) = ai::ask_question_streaming(&repo_state, &query, move || {
-                    pb.finish_and_clear();
+                let pb_clone = pb.clone();
+                let result = ai::ask_question_streaming(&repo_state, &query, move || {
+                    pb_clone.finish_and_clear();
                     println!();
-                }).await?;
+                }).await;
+                pb.finish_and_clear();
+                let (ans, useg) = result?;
                 answer = ans;
                 usage = useg;
                 println!("\n");
@@ -334,12 +339,15 @@ async fn main() -> Result<()> {
     } else {
         // Streaming mode — tokens print live as they arrive
         let pb = make_spinner("Analyzing repository and generating brief...")?;
-        let (summary, usage) = ai::analyze_repo_streaming(&repo_state, move || {
-            pb.finish_and_clear();
+        let pb_clone = pb.clone();
+        let result = ai::analyze_repo_streaming(&repo_state, move || {
+            pb_clone.finish_and_clear();
             println!("\n{}", "[ REPOSITORY BRIEF ]".bold());
             println!("{}", "─".repeat(60).bright_black());
         })
-        .await?;
+        .await;
+        pb.finish_and_clear();
+        let (summary, usage) = result?;
         println!("\n{}", "─".repeat(60).bright_black());
 
         if let (true, Some((p, c))) = (args.verbose, usage) {
