@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0](https://github.com/Chronos778/git-rewind/compare/v1.5.0...v1.6.0) - 2026-06-19
+
+### Added
+
+- implement initial CLI structure and core commands for AI-powered repository analysis and commit message generation
+- show cached model in diagnostic output
+
+### Fixed
+
+- resolve github actions ci type-check errors and unused warnings
+- resolve compilation error due to missing api_base parameter in get_cached_model
+- make json flag global and eliminate frozen spinner rendering on api errors
+- resolve data loss config overwrite and stale model cache bugs
+- resolve orphaned spinner on streaming termination, fix model UI state desync, and safely ignore empty API keys
+- ensure JSON formatting integrity across all commands and resolve configuration state leak during first-time interactive setup
+- append custom system_prompt to base instructions rather than completely overwriting the agent's identity
+- invalidate model cache when API Base URL changes to prevent model mismatch on proxy switching
+- correctly prioritize all environment variables above config file keys across providers
+- prevent local .rewindrc settings from leaking into global config.json during model cache persistence
+- prevent local .rewindrc settings from leaking into global config.json on mutation
+- prevent API payload bloat from massive untracked git status output
+- print warning when config json parsing fails instead of silently ignoring it
+- safely trim trailing slashes from API base globally instead of just in models
+- correctly display keys loaded from environment variables in config show command
+- refactor git diff size truncation to prevent API bloat on minified files
+- print telemetry to stderr when using json flag
+- correctly flag conflicted files in git status output
+- write info message to stderr to prevent json output corruption
+- enforce correct provider priority in ensure_configured
+- enforce correct provider priority in api_call
+- exclude .rewind-brief.md from diff generation
+- resolve .rewindrc from repository root
+- prevent double slashes in API base URLs
+- optimize large diff generation and include untracked files
+- resolve rewind history from repository root
+
+### Other
+
+- run cargo fmt to fix CI pipeline formatting errors
+- apply cargo fmt and make key masking robust
+
 ## [1.5.0](https://github.com/Chronos778/git-rewind/compare/v1.4.0...v1.5.0) - 2026-06-13
 
 ### Added
