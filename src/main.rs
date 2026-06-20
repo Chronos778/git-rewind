@@ -518,12 +518,16 @@ fn update_binary() -> Result<()> {
     self_update::Download::from_url(&archive_asset.download_url)
         .show_progress(true)
         .download_to(&mut archive_file)?;
+    archive_file.sync_all()?;
+    drop(archive_file);
 
     println!("Downloading checksum...");
     let mut checksum_file = std::fs::File::create(&checksum_path)?;
     self_update::Download::from_url(&checksum_asset.download_url)
         .show_progress(true)
         .download_to(&mut checksum_file)?;
+    checksum_file.sync_all()?;
+    drop(checksum_file);
 
     let checksum_content = std::fs::read_to_string(&checksum_path)?;
     let expected_hash = checksum_content
