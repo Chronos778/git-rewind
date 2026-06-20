@@ -41,7 +41,7 @@ echo "Downloading $URL..."
 curl -L -s -o "$TEMP_TAR" "$URL"
 
 echo "Downloading checksum..."
-if curl -fsSL -o "$TEMP_TAR.sha256" "$URL.sha256"; then
+if curl -fsSL -o "$TEMP_TAR.sha256" "${URL%.tar.gz}.sha256"; then
     echo "Verifying checksum..."
     EXPECTED_CHECKSUM=$(cat "$TEMP_TAR.sha256" | awk '{print $1}')
     if command -v sha256sum >/dev/null 2>&1; then

@@ -25,7 +25,7 @@ $TempZip = "$env:TEMP\rewind.zip"
 Write-Host "Downloading $($Asset.name)..."
 Invoke-WebRequest -Uri $Asset.browser_download_url -OutFile $TempZip -UseBasicParsing
 
-$ChecksumUrl = "$($Asset.browser_download_url).sha256"
+$ChecksumUrl = $Asset.browser_download_url -replace '\.zip$', '.sha256'
 $TempChecksum = "$env:TEMP\rewind.zip.sha256"
 Write-Host "Downloading checksum..."
 try {
