@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0](https://github.com/Chronos778/git-rewind/compare/v1.7.0...v1.8.0) - 2026-06-30
+
+### Added
+
+- prompt for API key on 401/403 errors
+
+### Fixed
+
+- remove unused api_key variable
+- improve error message formatting for invalid or expired API keys
+- resolve broken sha256 checksum URLs in installation scripts
+- flush and unlock file handles before sha256 checksum verification
+
+### Other
+
+- document cryptographic updater and bumped token limits
+
 ## [1.7.0](https://github.com/Chronos778/git-rewind/compare/v1.6.0...v1.7.0) - 2026-06-19
 
 ### Added
