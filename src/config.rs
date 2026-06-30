@@ -249,13 +249,14 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
             let p = Provider::from_name(&provider)?;
 
             // If key is not provided, prompt securely to avoid exposing it in shell history
-            let api_key = match key {
+            match key {
                 Some(k) => {
-                    config.set_api_key(p, Some(k.clone()));
+                    config.set_api_key(p, Some(k));
                     save_config(&config)?;
-                    k
                 }
-                None => prompt_and_save_key(p)?,
+                None => {
+                    prompt_and_save_key(p)?;
+                }
             };
             println!(
                 "{} API key for {} has been set.",
