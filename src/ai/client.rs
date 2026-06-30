@@ -88,7 +88,7 @@ pub async fn api_call(
     user_prompt: &str,
 ) -> Result<(String, Option<(u32, u32)>)> {
     let cfg = config::load_config()?;
-    let (provider, api_key) = resolve_provider_and_key(&cfg)?;
+    let (provider, mut api_key) = resolve_provider_and_key(&cfg)?;
     let (client, api_base, model) = setup_client(provider, &api_key, &cfg).await?;
 
     let payload = json!({
@@ -113,6 +113,13 @@ pub async fn api_call(
 
         match response {
             Ok(r) if r.status().is_success() => break r,
+            Ok(r) if r.status().as_u16() == 401 || r.status().as_u16() == 403 => {
+                use colored::Colorize;
+                eprintln!("\n{} API key for {} is invalid or expired.", "[ERROR]".red(), provider.display_name());
+                api_key = config::prompt_and_save_key(provider)?;
+                attempt = 0;
+                continue;
+            }
             Ok(r)
                 if attempt < MAX_RETRIES
                     && (r.status().as_u16() == 429 || r.status().is_server_error()) =>
@@ -162,7 +169,7 @@ pub async fn api_call_streaming(
     on_first_token: impl FnOnce(),
 ) -> Result<(String, Option<(u32, u32)>)> {
     let cfg = config::load_config()?;
-    let (provider, api_key) = resolve_provider_and_key(&cfg)?;
+    let (provider, mut api_key) = resolve_provider_and_key(&cfg)?;
     let (client, api_base, model) = setup_client(provider, &api_key, &cfg).await?;
 
     let payload = json!({
@@ -189,6 +196,13 @@ pub async fn api_call_streaming(
 
         match response {
             Ok(r) if r.status().is_success() => break r,
+            Ok(r) if r.status().as_u16() == 401 || r.status().as_u16() == 403 => {
+                use colored::Colorize;
+                eprintln!("\n{} API key for {} is invalid or expired.", "[ERROR]".red(), provider.display_name());
+                api_key = config::prompt_and_save_key(provider)?;
+                attempt = 0;
+                continue;
+            }
             Ok(r)
                 if attempt < MAX_RETRIES
                     && (r.status().as_u16() == 429 || r.status().is_server_error()) =>

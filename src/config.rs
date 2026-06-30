@@ -226,6 +226,21 @@ fn mask_key(secret: &SecretString) -> String {
     )
 }
 
+pub fn prompt_and_save_key(provider: Provider) -> Result<String> {
+    print!("Enter API key for {}: ", provider.display_name());
+    io::stdout().flush()?;
+    let k = rpassword::read_password().context("Failed to read API key")?;
+    let k = k.trim().to_string();
+    if k.is_empty() {
+        anyhow::bail!("No API key provided. Aborting.");
+    }
+
+    let mut config = load_global_config()?;
+    config.set_api_key(provider, Some(k.clone()));
+    save_config(&config)?;
+    Ok(k)
+}
+
 pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
     let mut config = load_global_config()?;
 
@@ -235,21 +250,13 @@ pub fn handle_config_command(action: ConfigCommands) -> Result<()> {
 
             // If key is not provided, prompt securely to avoid exposing it in shell history
             let api_key = match key {
-                Some(k) => k,
-                None => {
-                    print!("Enter API key for {}: ", p.display_name());
-                    io::stdout().flush()?;
-                    let k = rpassword::read_password().context("Failed to read API key")?;
-                    let k = k.trim().to_string();
-                    if k.is_empty() {
-                        anyhow::bail!("No API key provided. Aborting.");
-                    }
+                Some(k) => {
+                    config.set_api_key(p, Some(k.clone()));
+                    save_config(&config)?;
                     k
                 }
+                None => prompt_and_save_key(p)?,
             };
-
-            config.set_api_key(p, Some(api_key));
-            save_config(&config)?;
             println!(
                 "{} API key for {} has been set.",
                 "[SUCCESS]".green(),
