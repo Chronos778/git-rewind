@@ -115,7 +115,11 @@ pub async fn api_call(
             Ok(r) if r.status().is_success() => break r,
             Ok(r) if r.status().as_u16() == 401 || r.status().as_u16() == 403 => {
                 use colored::Colorize;
-                eprintln!("\n{} API key for {} is invalid or expired.", "[ERROR]".red(), provider.display_name());
+                eprintln!(
+                    "\n{} API key for {} is invalid or expired.",
+                    "[ERROR]".red(),
+                    provider.display_name()
+                );
                 api_key = config::prompt_and_save_key(provider)?;
                 attempt = 0;
                 continue;
@@ -198,7 +202,11 @@ pub async fn api_call_streaming(
             Ok(r) if r.status().is_success() => break r,
             Ok(r) if r.status().as_u16() == 401 || r.status().as_u16() == 403 => {
                 use colored::Colorize;
-                eprintln!("\n{} API key for {} is invalid or expired.", "[ERROR]".red(), provider.display_name());
+                eprintln!(
+                    "\n{} API key for {} is invalid or expired.",
+                    "[ERROR]".red(),
+                    provider.display_name()
+                );
                 api_key = config::prompt_and_save_key(provider)?;
                 attempt = 0;
                 continue;
